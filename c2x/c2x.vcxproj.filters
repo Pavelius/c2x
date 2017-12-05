@@ -31,6 +31,9 @@
     <ClInclude Include="io.h">
       <Filter>Поддержка</Filter>
     </ClInclude>
+    <ClInclude Include="evalue.h">
+      <Filter>Компилятор</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="collection.cpp">
@@ -76,6 +79,18 @@
       <Filter>Поддержка</Filter>
     </ClCompile>
     <ClCompile Include="status_state.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="evalue.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="evalue_plugin.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="genstate.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="segment.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>
   </ItemGroup>

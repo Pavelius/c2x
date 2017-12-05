@@ -1,6 +1,4 @@
-#include "crt.h"
-#include "evalue.h"
-#include "genstate.h"
+#include "c2.h"
 
 using namespace c2;
 
@@ -16,10 +14,10 @@ using namespace c2;
 // Формула адресации
 // [reg + sym.offset + offset]
 
-static type			lvalue_type[2];
+static symbol		lvalue_type[2];
 evalue::plugin*		c2::backend;
 
-evalue::evalue() : result(type::i32), sym(0), offset(0), reg(Const), next(0)
+evalue::evalue() : result(i32), sym(0), offset(0), reg(Const), next(0)
 {
 }
 
@@ -30,13 +28,13 @@ evalue::evalue(evalue* e) : evalue()
 
 void evalue::set(int value)
 {
-	this->result = type::i32;
+	this->result = i32;
 	this->offset = value;
 	this->sym = 0;
 	this->reg = Const;
 }
 
-void evalue::set(type* value)
+void evalue::set(symbol* value)
 {
 	if(!value)
 		set(0);
@@ -47,11 +45,11 @@ void evalue::set(type* value)
 		this->sym = 0;
 		this->reg = Const;
 	}
-	else if(value->isconstant())
-	{
-		set(value->value);
-		this->result = value->result;
-	}
+	//else if(value->isconstant())
+	//{
+	//	set(value->value);
+	//	this->result = value->result;
+	//}
 	else
 	{
 		this->result = value->result;
@@ -81,9 +79,9 @@ void evalue::clear()
 	evalue();
 }
 
-registers evalue::getfree() const
+register_s evalue::getfree() const
 {
-	static registers valid_registers[] = {Eax, Ebx, Ecx, Edx, Esi, Edi};
+	static register_s valid_registers[] = {Eax, Ebx, Ecx, Edx, Esi, Edi};
 	for(auto result : valid_registers)
 	{
 		bool all_correct = true;
@@ -106,7 +104,7 @@ int	evalue::localalloc(unsigned size)
 	return 0;
 }
 
-void evalue::load(registers r)
+void evalue::load(register_s r)
 {
 	if(reg != r || sym)
 	{
@@ -149,7 +147,7 @@ void evalue::xchange(evalue& e)
 	iswap(result, e.result);
 }
 
-void evalue::cast(type* need_type)
+void evalue::cast(symbol* need_type)
 {
 	if(result == need_type)
 		return;

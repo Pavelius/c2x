@@ -11,6 +11,8 @@ void c2::errorv(message_s m, const symbol* module, const symbol* member, const c
 }
 
 int main(int argc, char *argv[]) {
-	c2::compile("C:/Users/p.chistyakov/Source/Repos/c2/c2code/projects/anytest/main.c2");
+	urls::project = "c2code/projects/anytest";
+	urls::library = "c2code/library";
+	c2::compile(szdup("main"));
 	return 0;
 }

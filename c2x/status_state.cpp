@@ -2,4 +2,4 @@
 
 using namespace c2;
 
-status_state c2::status;
+state_state c2::state;

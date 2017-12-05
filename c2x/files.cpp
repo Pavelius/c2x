@@ -70,7 +70,7 @@ static char* findfile(char* result, const char* base, const char* url) {
 	for(auto e : valid_extensions) {
 		findfile(result, base, url, e);
 		if(io::file::exist(result))
-			return result;
+			return szurlc(result);
 	}
 	return 0;
 }

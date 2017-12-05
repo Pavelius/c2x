@@ -10,22 +10,22 @@ using namespace c2;
 struct parsestate
 {
 	const char*				p;
-	struct type*			module;
-	struct type*			member;
+	struct symbol*			module;
+	struct symbol*			member;
 	parsestate();
 	~parsestate();
 };
 
 static parsestate			ps;
-static adat<type*>			locals;
-static aref<type*>			used_symbols;
+static adat<symbol*>			locals;
+static aref<symbol*>			used_symbols;
 static int					errors;
 static int					maximum_stack_frame;
 static void					statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
 static void					logical_or(evalue& e1);
 static void					assigment(evalue& e1);
-void(*c2::errorproc)(messages m, const type* module, const type* member, const char* parameters);
-void(*c2::statusproc)(messages m, const type* module, const type* member, const char* parameters);
+void(*c2::errorproc)(messages m, const symbol* module, const symbol* member, const char* parameters);
+void(*c2::statusproc)(messages m, const symbol* module, const symbol* member, const char* parameters);
 
 parsestate::parsestate() : parsestate(ps)
 {
@@ -52,7 +52,7 @@ void c2::status(messages m, ...)
 	}
 }
 
-static void declare_status(messages m, const type* member, ...)
+static void declare_status(messages m, const symbol* member, ...)
 {
 	if(statusproc)
 		statusproc(m, ps.module, member, xva_start(member));
@@ -86,8 +86,7 @@ static int label()
 	return segments[Code]->get();
 }
 
-
-static void addr32(int v, type* sym)
+static void addr32(int v, symbol* sym)
 {
 	auto s = 4;
 	while(s > 0)
@@ -98,11 +97,11 @@ static void addr32(int v, type* sym)
 	}
 }
 
-static void calling(type* sym, evalue* parameters, int count)
+static void calling(symbol* sym, evalue* parameters, int count)
 {
 }
 
-static void prologue(type* sym)
+static void prologue(symbol* sym)
 {
 	if(!ps.module || !sym)
 		return;
@@ -113,7 +112,7 @@ static void prologue(type* sym)
 	}
 }
 
-static void epilogue(type* sym)
+static void epilogue(symbol* sym)
 {
 	if(!ps.module || !sym)
 		return;
@@ -121,7 +120,7 @@ static void epilogue(type* sym)
 		backend->epilogue(ps.module, sym);
 }
 
-static void retproc(type* sym)
+static void retproc(symbol* sym)
 {
 	if(!sym)
 		return;
@@ -366,7 +365,7 @@ static int expression_const()
 	return e1.offset;
 }
 
-static type* expression_const_type()
+static symbol* expression_const_type()
 {
 	genstate push;
 	gen.code = false;
@@ -380,7 +379,7 @@ static type* expression_const_type()
 	return result;
 }
 
-static type* parse_pointer(type* declared)
+static symbol* parse_pointer(symbol* declared)
 {
 	while(*ps.p == '*')
 	{
@@ -390,9 +389,9 @@ static type* parse_pointer(type* declared)
 	return declared;
 }
 
-static bool istype(c2::type** declared, unsigned& flags)
+static bool istype(c2::symbol** declared, unsigned& flags)
 {
-	type* e = type::i32;
+	symbol* e = type::i32;
 	bool result = false;
 	int m_public = 0;
 	int m_static = 0;
@@ -454,7 +453,7 @@ static bool istype(c2::type** declared, unsigned& flags)
 	return result;
 }
 
-static void initialize(type* sym)
+static void initialize(symbol* sym)
 {
 	if(sym->count && *ps.p == '{')
 	{
@@ -548,12 +547,12 @@ static void initialize(type* sym)
 	}
 }
 
-static int get_stack_frame(type* variable)
+static int get_stack_frame(symbol* variable)
 {
 	return 8;
 }
 
-static void instance(type* variable, bool allow_assigment)
+static void instance(symbol* variable, bool allow_assigment)
 {
 	bool was_initialized = (*ps.p == '=');
 	if(variable->ismethod())
@@ -634,15 +633,15 @@ static void instance(type* variable, bool allow_assigment)
 }
 
 // Чтобы можно было в секции данных размещать ресурсы и подтягивать их под переменные.
-static bool declaration(type* parent, unsigned flags, bool allow_functions = true, bool allow_variables = true, bool allow_dynamic_isntance = false)
+static bool declaration(symbol* parent, unsigned flags, bool allow_functions = true, bool allow_variables = true, bool allow_dynamic_isntance = false)
 {
-	type* declared;
+	symbol* declared;
 	const char* p1 = ps.p;
 	if(!istype(&declared, flags))
 		return false;
 	while(*ps.p)
 	{
-		c2::type* result = parse_pointer(declared);
+		c2::symbol* result = parse_pointer(declared);
 		auto id = szdup(identifier());
 		if(*ps.p == '(' && !allow_functions)
 		{
@@ -675,7 +674,7 @@ static bool declaration(type* parent, unsigned flags, bool allow_functions = tru
 				}
 			}
 		}
-		type* m2 = 0;
+		symbol* m2 = 0;
 		if(islocal)
 			m2 = type::createloc(id, result, flags);
 		else
@@ -691,7 +690,7 @@ static bool declaration(type* parent, unsigned flags, bool allow_functions = tru
 			m2->count = 0;
 			while(*ps.p)
 			{
-				type* result;
+				symbol* result;
 				unsigned pflags = 0;
 				if(istype(&result, pflags))
 				{
@@ -756,7 +755,7 @@ static bool declaration(type* parent, unsigned flags, bool allow_functions = tru
 
 static bool direct_cast(evalue& e1)
 {
-	type* declared;
+	symbol* declared;
 	unsigned flags = 0;
 	const char* p1 = ps.p;
 	if(!istype(&declared, flags))
@@ -969,7 +968,7 @@ static void function_call(evalue& e1)
 	e1.sym = 0;
 }
 
-static type* forward_declare(type* sym, type* parent, const char* id)
+static symbol* forward_declare(symbol* sym, symbol* parent, const char* id)
 {
 	if(sym || !id || !parent)
 		return sym;
@@ -1041,7 +1040,7 @@ static void postfix(evalue& e1)
 	}
 }
 
-static void register_used_symbol(type* sym)
+static void register_used_symbol(symbol* sym)
 {
 	if(!gen.methods)
 		return;
@@ -1130,7 +1129,7 @@ static void unary(evalue& e1)
 		if(match("sizeof"))
 		{
 			skip('(');
-			c2::type* sym = expression_const_type();
+			c2::symbol* sym = expression_const_type();
 			e1.set(sym->size);
 			skip(')');
 		}
@@ -1143,7 +1142,7 @@ static void unary(evalue& e1)
 		else if(ischa(*ps.p))
 		{
 			const char* n = szdup(identifier());
-			c2::type* sym = 0;
+			c2::symbol* sym = 0;
 			if(!sym)
 			{
 				// Find local symbols
@@ -1557,8 +1556,8 @@ static void block_enums()
 		identifier();
 		skip('{');
 		int num = 0;
-		c2::type* result = type::i32;
-		c2::type* t = 0;
+		c2::symbol* result = type::i32;
+		c2::symbol* t = 0;
 		while(*ps.p)
 		{
 			if(ischab(*ps.p))
@@ -1595,7 +1594,7 @@ static void block_enums()
 	}
 }
 
-static void parse_module(type* member);
+static void parse_module(symbol* member);
 
 static void block_imports()
 {
@@ -1654,7 +1653,7 @@ static void block_imports()
 	}
 }
 
-static void block_start(type* module)
+static void block_start(symbol* module)
 {
 	ps.p = getfile(module->id);
 	if(!ps.p)
@@ -1667,7 +1666,7 @@ static void block_start(type* module)
 	next(ps.p);
 }
 
-static void parse_module(type* member)
+static void parse_module(symbol* member)
 {
 	block_start(member);
 	if(errors)
@@ -1689,7 +1688,7 @@ static void parse_module(type* member)
 		status(ErrorUnexpectedSymbols);
 }
 
-static void compile_member(type* member)
+static void compile_member(symbol* member)
 {
 	if(!member)
 		return;

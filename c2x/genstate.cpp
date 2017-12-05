@@ -1,4 +1,4 @@
-#include "genstate.h"
+#include "c2.h"
 
 using namespace c2;
 
