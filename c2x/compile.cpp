@@ -276,58 +276,58 @@ static const char* identifier() {
 //	}
 //}
 //
-//static bool istype(symbol** declared, unsigned& flags) {
-//	auto e = i32;
-//	bool result = false;
-//	int m_public = 0;
-//	int m_static = 0;
-//	int m_unsigned = 0;
-//	while(*ps.p) {
-//		if(match("static")) {
-//			result = true;
-//			m_static++;
-//			continue;
-//		} else if(match("public")) {
-//			result = true;
-//			m_public++;
-//			continue;
-//		} else if(match("unsigned")) {
-//			result = true;
-//			m_unsigned++;
-//			continue;
-//		} else if(ischab(*ps.p)) {
-//			const char* p1 = ps.p;
-//			auto id = szdup(identifier());
-//			// Теперь надо найти тип, и убедиться, что это действительно определение
-//			bool change_back = true;
-//			e = ps.module->findmembertype(id, m_unsigned);
-//			if(e) {
-//				if(*ps.p == '*' || ischa(*ps.p)) {
-//					change_back = false;
-//					result = true;
-//				}
-//			}
-//			if(change_back)
-//				ps.p = p1;
-//		}
-//		if(result) {
-//			if(m_static > 1)
-//				status(Error1pDontUse2pTimes, "static", m_static);
-//			if(m_public > 1)
-//				status(Error1pDontUse2pTimes, "public", m_public);
-//			if(m_unsigned > 1)
-//				status(Error1pDontUse2pTimes, "unsigned", m_unsigned);
-//			if(m_static)
-//				set(flags, Static);
-//			if(m_public)
-//				set(flags, Public);
-//			*declared = e;
-//		}
-//		break;
-//	}
-//	return result;
-//}
-//
+static bool istype(symbol** declared, unsigned& flags) {
+	auto e = i32;
+	bool result = false;
+	int m_public = 0;
+	int m_static = 0;
+	int m_unsigned = 0;
+	while(*ps.p) {
+		if(match("static")) {
+			result = true;
+			m_static++;
+			continue;
+		} else if(match("public")) {
+			result = true;
+			m_public++;
+			continue;
+		} else if(match("unsigned")) {
+			result = true;
+			m_unsigned++;
+			continue;
+		} else if(ischab(*ps.p)) {
+			const char* p1 = ps.p;
+			auto id = szdup(identifier());
+			// Теперь надо найти тип, и убедиться, что это действительно определение
+			bool change_back = true;
+			e = findtype(id, m_unsigned);
+			if(e) {
+				if(*ps.p == '*' || ischa(*ps.p)) {
+					change_back = false;
+					result = true;
+				}
+			}
+			if(change_back)
+				ps.p = p1;
+		}
+		if(result) {
+			if(m_static > 1)
+				status(Error1pDontUse2pTimes, "static", m_static);
+			if(m_public > 1)
+				status(Error1pDontUse2pTimes, "public", m_public);
+			if(m_unsigned > 1)
+				status(Error1pDontUse2pTimes, "unsigned", m_unsigned);
+			if(m_static)
+				set(flags, Static);
+			if(m_public)
+				set(flags, Public);
+			*declared = e;
+		}
+		break;
+	}
+	return result;
+}
+
 //static void initialize(symbol* sym) {
 //	if(sym->count && *ps.p == '{') {
 //		next(ps.p + 1);
@@ -473,103 +473,91 @@ static const char* identifier() {
 //			variable->parent->size = variable->value + variable->size;
 //	}
 //}
-//
-//static symbol* parse_pointer(symbol* declared) {
-//	while(*ps.p == '*') {
-//		next(ps.p + 1);
-//		declared = declared->reference();
-//	}
-//	return declared;
-//}
-//
-//static bool declaration(symbol* parent, unsigned flags, bool allow_functions = true, bool allow_variables = true, bool allow_dynamic_isntance = false) {
-//	symbol* declared;
-//	const char* p1 = ps.p;
-//	if(!istype(&declared, flags))
-//		return false;
-//	while(*ps.p) {
-//		auto result = parse_pointer(declared);
-//		auto id = szdup(identifier());
-//		if(*ps.p == '(' && !allow_functions) {
-//			ps.p = p1;
-//			return false;
-//		} else if(*ps.p != '(' && !allow_variables) {
-//			ps.p = p1;
-//			return false;
-//		}
-//		bool islocal = parent->ismethod() && !is(flags, Static);
-//		if(gen.unique) {
-//			// Test unique members
-//			if(islocal) {
-//			} else {
-//				for(auto pm = parent->getchild(); pm; pm = pm->getnext(parent)) {
-//					if(pm->isforward())
-//						continue;
-//					if(pm->id == id) {
-//						status(Error1p2pAlreadyDefined, "identifier", id);
-//						break;
-//					}
-//				}
-//			}
-//		}
-//		auto m2 = symbol::add(id, result);
-//		//declare_status(StatusDeclare, m2);
-//		if(*ps.p == '(') {
-//			scope_state push;
-//			scope.member = m2;
-//			next(ps.p + 1);
-//			m2->setmethod();
-//			m2->count = 0;
-//			while(*ps.p) {
-//				symbol* result;
-//				unsigned pflags = 0;
-//				if(istype(&result, pflags)) {
-//					result = parse_pointer(result);
-//					auto id = szdup(identifier());
-//					result = symbol::add(id, result);
-//					result->setmethodparam();
-//					instance(result, false);
-//					m2->count++;
-//				}
-//				if(*ps.p == ')') {
-//					next(ps.p + 1);
-//					break;
-//				}
-//				skip(',');
-//			}
-//			if(*ps.p == ';') {
-//				// Forward declaration
-//				next(ps.p + 1);
-//			} else {
-//				scope_state push;
-//				prologue(m2);
-//				statement(0, 0, 0, 0);
-//				retproc(m2);
-//				epilogue(m2);
-//			}
-//			return true;
-//		} else if(*ps.p == '[') {
-//			next(ps.p + 1);
-//			if(*ps.p == ']') {
-//				next(ps.p + 1);
-//				m2->count = -1;
-//				if(*ps.p != '=')
-//					m2->count = 0;
-//			} else {
-//				m2->count = expression_const();
-//				skip(']');
-//			}
-//		}
-//		instance(m2, allow_dynamic_isntance);
-//		if(*ps.p == ';') {
-//			next(ps.p + 1);
-//			break;
-//		}
-//		skip(',');
-//	}
-//	return true;
-//}
-//
+
+static symbol* parse_pointer(symbol* declared) {
+	while(*ps.p == '*') {
+		next(ps.p + 1);
+		declared = declared->reference();
+	}
+	return declared;
+}
+
+static bool declaration(unsigned flags, bool allow_functions = true, bool allow_variables = true, bool allow_dynamic_isntance = false) {
+	symbol* declared;
+	const char* p1 = ps.p;
+	if(!istype(&declared, flags))
+		return false;
+	while(*ps.p) {
+		auto result = parse_pointer(declared);
+		auto id = szdup(identifier());
+		if(*ps.p == '(' && !allow_functions) {
+			ps.p = p1;
+			return false;
+		} else if(*ps.p != '(' && !allow_variables) {
+			ps.p = p1;
+			return false;
+		}
+		bool islocal = scope.member->isfunction() && !is(flags, Static);
+		if(gen.unique) {
+			// Если нашли совпадение выдаем ошибку
+		}
+		auto m2 = addsymbol(id, result, scope.member, SymbolMember);
+		//declare_status(StatusDeclare, m2);
+		if(*ps.p == '(') {
+			scope_state push;
+			scope.member = m2;
+			next(ps.p + 1);
+			m2->type = SymbolMember;
+			m2->count = 0;
+			while(*ps.p) {
+				symbol* result;
+				unsigned pflags = 0;
+				if(istype(&result, pflags)) {
+					result = parse_pointer(result);
+					auto id = szdup(identifier());
+					result = addsymbol(id, result, scope.member, SymbolParameter);
+					//instance(result, false);
+					m2->count++;
+				}
+				if(*ps.p == ')') {
+					next(ps.p + 1);
+					break;
+				}
+				skip(',');
+			}
+			if(*ps.p == ';') {
+				// Forward declaration
+				next(ps.p + 1);
+			} else {
+				scope_state push;
+				prologue(m2);
+				//statement(0, 0, 0, 0);
+				retproc(m2);
+				epilogue(m2);
+			}
+			return true;
+		} else if(*ps.p == '[') {
+			next(ps.p + 1);
+			if(*ps.p == ']') {
+				next(ps.p + 1);
+				m2->count = -1;
+				if(*ps.p != '=')
+					m2->count = 0;
+			} else {
+				//m2->count = expression_const();
+				skip(']');
+			}
+		}
+		//instance(m2, allow_dynamic_isntance);
+		if(*ps.p == ';') {
+			next(ps.p + 1);
+			break;
+		}
+		skip(',');
+	}
+	return true;
+}
+
 //static bool direct_cast(evalue& e1) {
 //	symbol* declared;
 //	unsigned flags = 0;
@@ -1227,29 +1215,29 @@ static const char* identifier() {
 //}
 
 static void block_declaration() {
-	//while(declaration(scope.member, 0, false, true));
+	while(declaration(0, false, true));
 }
 
 static void block_function() {
-	//while(declaration(scope.member, 0, true, false));
+	while(declaration(0, true, false));
 }
 
 static void block_enums() {
 	while(match("enum")) {
 		identifier();
+		symbol* result = i32;
 		skip('{');
 		int num = 0;
-		symbol* result = i32;
 		symbol* t = 0;
 		while(*ps.p) {
 			if(ischab(*ps.p)) {
-				t = addsymbol(identifier(), result, scope.member);
-				t->setconstant(num++);
+				t = addsymbol(identifier(), result, scope.member, SymbolConstant);
+				t->value = num++;
 			} else if(*ps.p == '=') {
 				next(ps.p + 1);
 				//num = expression_const();
 				if(t)
-					t->setconstant(num);
+					t->value = num;
 				else
 					status(ErrorAssigmentWithoutEnumeratorMember);
 			} else if(*ps.p == ',') {
@@ -1290,13 +1278,13 @@ static void block_imports() {
 			auto id = szdup(pz);
 			auto m = findmodule(url);
 			if(!m) {
-				m = addsymbol(url, 0, types);
+				m = addsymbol(url, 0, types, SymbolType);
 				m->visibility = 0;
 				parse_module(m);
 			}
 			if(isloaded(m))
 				error(Error1p2pAlreadyDefined, "import module", m->id);
-			addsymbol(id, m, scope.member);
+			addsymbol(id, m, scope.member, SymbolTypedef);
 			skip(';');
 			break;
 		}
@@ -1318,31 +1306,27 @@ static void block_start(symbol* sym) {
 }
 
 static void parse_module(symbol* member) {
-	state_state state_push();
-	parser_state parser_push();
+	scope_state push;
+	const char* p1 = ps.p;
 	block_start(member);
-	if(errors)
-		return;
-	block_imports();
-	if(errors)
-		return;
-	status(StatusStartParse);
-	block_enums();
-	//if(errors)
-	//	return;
-	//block_declaration();
-	//if(errors)
-	//	return;
-	//block_function();
-	//if(errors)
-	//	return;
-	//if(*ps.p && !errors)
-	//	status(ErrorUnexpectedSymbols);
+	if(!errors)
+		block_imports();
+	if(!errors) {
+		status(StatusStartParse);
+		block_enums();
+	}
+	if(!errors)
+		block_declaration();
+	if(!errors)
+		block_function();
+	if(!errors && *ps.p)
+		status(ErrorUnexpectedSymbols);
+	ps.p = p1;
 }
 
 void c2::compile(const char* id) {
-	auto p = findsymbol(id, 0);
-	if(!p)
-		p = addsymbol(id, 0);
-	parse_module(p);
+	auto p = findsymbol(id, 0, SymbolType);
+	if(p)
+		return;
+	parse_module(addsymbol(id, 0, types, SymbolType));
 }

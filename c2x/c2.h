@@ -35,7 +35,7 @@ namespace c2 {
 		FirstStatus = StatusStartParse, LastStatus = StatusDeclare,
 	};
 	enum flag_s : char {
-		Public, Static, Readed, Writed, NoInitialized, Function, Parameter,
+		Public, Static, Readed, Writed, NoInitialized
 	};
 	enum register_s : char {
 		Eax, Ebx, Ecx, Edx, Esi, Edi, Esp, Ebp,
@@ -43,6 +43,11 @@ namespace c2 {
 	};
 	enum sectiontypes : char {
 		Code, Data, DataStrings, DataUninitialized,
+	};
+	enum symbol_s : char {
+		SymbolType, SymbolTypedef, SymbolConstant,
+		SymbolMember, SymbolFunction,
+		SymbolLocal, SymbolParameter,
 	};
 	struct state_state {
 		bool			error_double_identifier;
@@ -53,15 +58,18 @@ namespace c2 {
 		const char*		visibility;
 		unsigned		size;
 		unsigned		count;
-		unsigned		flags;
 		symbol*			parent;
 		int				value;
+		short unsigned	flags;
+		symbol_s		type;
 		//
 		operator bool() const { return id != 0; }
 		void			clear();
 		symbol*			dereference();
 		symbol*			getchild();
 		symbol*			getnext(symbol* parent);
+		unsigned		getsize() const { return size*count;}
+		static void		initialize();
 		bool			isforward() const;
 		bool			isfunction() const;
 		bool			islocal() const;
@@ -72,9 +80,8 @@ namespace c2 {
 		bool			isstatic() const;
 		bool			istype() const;
 		symbol*			reference();
-		void			setconstant(int value) { this->value = value; }
-		void			setfunction() {}
-		void			setfunctionfw() {}
+		void			setfunction() { type = SymbolFunction; }
+		void			setfunctionfw() { type = SymbolFunction; }
 	};
 	struct scope_state {
 		scope_state*	parent;
@@ -140,16 +147,17 @@ namespace c2 {
 		virtual unsigned char*	getdata() = 0;
 		virtual void	set(unsigned count) = 0;
 	};
-	symbol*				addsymbol(const char* id, symbol* result, symbol* parent = 0);
+	symbol*				addsymbol(const char* id, symbol* result, symbol* parent, symbol_s type);
 	extern segment*		segments[DataUninitialized + 1];
 	extern evalue::plugin*	backend;
 	void				compile(const char* url);
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
-	symbol*				findsymbol(const char* id);
-	symbol*				findsymbol(const char* id, const char* visibility);
-	symbol*				findmodule(const char* name);
+	symbol*				findsymbol(const char* id, symbol_s type);
+	symbol*				findsymbol(const char* id, const char* visibility, symbol_s type);
+	symbol*				findtype(const char* id, unsigned modifier_unsigned);
+	symbol*				findmodule(const char* url);
 	extern genstate		gen;
 	inline bool			is(unsigned flags, flag_s value) { return (flags & (1 << value)) != 0; }
 	bool				isloaded(symbol* result);

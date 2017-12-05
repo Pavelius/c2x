@@ -22,7 +22,7 @@ void symbol::clear() {
 }
 
 bool symbol::istype() const {
-	return this && (parent == types || parent == types_platform || parent == types_ref);
+	return this && type == SymbolType;
 }
 
 bool symbol::ismember() const {
@@ -38,11 +38,11 @@ bool symbol::isstatic() const {
 }
 
 bool symbol::isfunction() const {
-	return ismember() && is(flags, Function);
+	return this && type == SymbolFunction;
 }
 
 bool symbol::ismethodparam() const {
-	return this && is(flags, Parameter);
+	return this && type == SymbolParameter;
 }
 
 bool symbol::islocal() const {
@@ -70,12 +70,48 @@ bool c2::isloaded(symbol* result) {
 	return false;
 }
 
-symbol* c2::findsymbol(const char* name, const char* visibility) {
+symbol* c2::findsymbol(const char* name, const char* visibility, symbol_s type) {
 	for(auto& e : symbols) {
-		if(e.id == name && e.visibility == visibility)
+		if(e.id == name && e.visibility == visibility && e.type==type)
 			return &e;
 	}
 	return 0;
+}
+
+symbol* c2::findsymbol(const char* id, symbol_s type) {
+	for(auto psc = &scope; psc; psc = psc->parent) {
+		auto sym = findsymbol(id, psc->visibility, type);
+		if(sym)
+			return sym;
+	}
+	return 0;
+}
+
+symbol* c2::findtype(const char* id, unsigned modifier_unsigned) {
+	// Найдем стандартный тип
+	for(auto e : standart_types) {
+		if(e->id == id)
+			return e;
+	}
+	// Маленькие типы
+	if(strcmp(id, "bool") == 0 || strcmp(id, "char") == 0) {
+		if(modifier_unsigned)
+			return u8;
+		return i8;
+	}
+	// Короткое число
+	if(strcmp(id, "short") == 0) {
+		if(modifier_unsigned)
+			return u16;
+		return i16;
+	}
+	// Целое число
+	if(strcmp(id, "int") == 0) {
+		if(modifier_unsigned)
+			return u32;
+		return i32;
+	}
+	return findsymbol(id, SymbolTypedef);
 }
 
 symbol* symbol::getchild() {
@@ -95,15 +131,6 @@ symbol* symbol::getnext(symbol* parent) {
 	return 0;
 }
 
-symbol* c2::findsymbol(const char* id) {
-	for(auto psc = &scope; psc; psc = psc->parent) {
-		auto sym = findsymbol(id, psc->visibility);
-		if(sym)
-			return sym;
-	}
-	return 0;
-}
-
 static symbol* addsymboln() {
 	for(auto& e : symbols) {
 		if(!e)
@@ -112,8 +139,8 @@ static symbol* addsymboln() {
 	return symbols.add();
 }
 
-symbol* c2::addsymbol(const char* id, symbol* result, symbol* parent) {
-	auto p = findsymbol(id, scope.visibility);
+symbol* c2::addsymbol(const char* id, symbol* result, symbol* parent, symbol_s type) {
+	auto p = findsymbol(id, scope.visibility, type);
 	if(p) {
 		if(state.error_double_identifier)
 			error(Error1p2pAlreadyDefined, "symbol", id);
@@ -126,6 +153,7 @@ symbol* c2::addsymbol(const char* id, symbol* result, symbol* parent) {
 		parent = scope.member;
 	p->clear();
 	p->id = id;
+	p->type = type;
 	p->result = result;
 	p->parent = parent;
 	p->visibility = scope.visibility;
@@ -153,4 +181,20 @@ symbol* symbol::dereference() {
 	if(!ispointer())
 		return 0;
 	return result;
+}
+
+void basetype(symbol* p, const char* name, unsigned size) {
+	p->id = szdup(name);
+	p->size = size;
+	p->parent = types;
+}
+
+void symbol::initialize() {
+	basetype(i8, "int8", 1);
+	basetype(i16, "int16", 2);
+	basetype(i32, "int32", 4);
+	basetype(u8, "uint8", 1);
+	basetype(u16, "uint16", 2);
+	basetype(u32, "uint32", 4);
+	basetype(v0, "void", 0);
 }
