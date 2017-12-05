@@ -1,0 +1,26 @@
+﻿import geo.point;
+
+short x1, y1;
+short x2, y2;
+
+void set(int nx1, int ny1, int nx2, int ny2);
+int height();
+
+// Set arguments of list
+void set(int nx1, int ny1, int nx2, int ny2)
+{
+	this.x1 = nx1;
+	this.y1 = ny1;
+	this.x2 = nx1;
+	this.y2 = ny1;
+}
+
+int height()
+{
+	return y2-y1;
+}
+
+int width()
+{
+	return x2-x1;
+}

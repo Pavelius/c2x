@@ -1,17 +1,104 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Исходные файлы">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <ClInclude Include="adat.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="aref.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="autogrow.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="collection.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="crt.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="stringcreator.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+    <ClInclude Include="win.h">
+      <Filter>Платформа</Filter>
+    </ClInclude>
+    <ClInclude Include="files.h">
+      <Filter>Приложение</Filter>
+    </ClInclude>
+    <ClInclude Include="c2.h">
+      <Filter>Компилятор</Filter>
+    </ClInclude>
+    <ClInclude Include="io.h">
+      <Filter>Поддержка</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="collection.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="crt.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="crt_memory.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="stringcreator.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="szdup.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="win_console.cpp">
+      <Filter>Платформа</Filter>
+    </ClCompile>
+    <ClCompile Include="win_io_file.cpp">
+      <Filter>Платформа</Filter>
+    </ClCompile>
+    <ClCompile Include="files.cpp">
+      <Filter>Приложение</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Приложение</Filter>
+    </ClCompile>
+    <ClCompile Include="messages.cpp">
+      <Filter>Приложение</Filter>
+    </ClCompile>
+    <ClCompile Include="compile.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="scope_state.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="symbol.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="io.cpp">
+      <Filter>Поддержка</Filter>
+    </ClCompile>
+    <ClCompile Include="status_state.cpp">
+      <Filter>Компилятор</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Поддержка">
+      <UniqueIdentifier>{fec40b3c-0839-448e-852c-ac70ec6a9163}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Файлы заголовков">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    <Filter Include="Платформа">
+      <UniqueIdentifier>{04ab4ba4-7c9a-493a-a63e-7a66ad5855b3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Файлы ресурсов">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Приложение">
+      <UniqueIdentifier>{785929b5-dc0e-43c5-9c3e-57c990e5aaa1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Компилятор">
+      <UniqueIdentifier>{0715e998-b495-4b80-8e78-7aefd97e5afb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Пример">
+      <UniqueIdentifier>{47fdcb39-b23c-493e-bde4-49e5a8fa5c13}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\c2code\projects\anytest\main.c2">
+      <Filter>Пример</Filter>
+    </None>
   </ItemGroup>
 </Project>

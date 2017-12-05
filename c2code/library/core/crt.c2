@@ -1,0 +1,8 @@
+import platform.kernel32;
+
+// leave current program width specified exit code
+void exit(int code)
+{
+	int a, b = 10;
+	kernel32.ExitProcess(code);
+}

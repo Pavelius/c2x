@@ -1,0 +1,10 @@
+//import ui.message;import core.crt;import core.string as this;
+int main()
+{
+	char test = "Test another";//	char temp[260];//	cpy(temp, "Test string");//	cat(temp, " is ");//	number(end(temp), 11, 6, 0, 10);
+//	cat(temp, "\n");
+//	cat(temp, "And lenght string \'");
+//	cat(temp, test);
+//	cat(temp, "\' is ");
+//	number(end(temp), len(test), 0, 0, 10);//	message.text(temp, "Test - Caption");
+	len(test);	crt.exit(0);}

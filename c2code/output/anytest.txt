@@ -1,0 +1,23 @@
+main PROC
+mov eax, [3]
+mov [ebp+0], eax
+mov [ebp-4], 8
+neg [ebp-4]
+add 6, 12
+ret
+add 4, eax
+mov [ebp-8], 4
+mov eax, [ebp-8]
+add eax, [ebp-4]
+sub eax, 2
+mov [ebp-8], eax
+mov [ebp-4], 1
+add 6, 12
+ret
+ENDP
+
+testmain PROC
+ret
+ret
+ENDP
+

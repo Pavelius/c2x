@@ -1,0 +1,80 @@
+﻿{
+  "Settings":{
+    "Editor":{
+      "General":{
+        "View":{
+          "Show line number":1,
+          "Calculate digits of line number automatically":1,
+          "Line number digits":5,
+          "Use auto-indent":1,
+          "Use auto-change":1,
+          "Use context help":1
+        }
+      },
+      "Context help":{
+        "Appear after symbols":1
+      }
+    },
+    "Appearance":{
+      "Editor":{
+        "Numbers color":16384200,
+        "Block color":6579300,
+        "Strings color":10511360,
+        "Keywords color":200,
+        "Operators color":13107200,
+        "Type color":35723,
+        "Comments color":25600,
+        "Preprocessor color":51200
+      },
+      "General":{
+        "View":{
+          "Show status bar panel":1,
+          "Show right controls panel":1,
+          "Paddings on main view":1
+        },
+        "Metrics":{
+          "Padding spacing":4,
+          "Scroll width":20
+        }
+      },
+      "Forms":{
+        "Window color":16777215,
+        "Form color":15790320,
+        "Border color":11316396,
+        "Active color":11304960,
+        "Button color":14671839,
+        "Edit color":11392767,
+        "Workspace color":14144445
+      }
+    },
+    "Workspace":{
+      "Urls":{
+        "Workspace folder":"z:\/projects\/c2code",
+        "Compiler folder":"",
+        "Output folder":"z:\/application"
+      }
+    },
+    "Localization":{
+      "General":{
+        "Language":{
+          "English":1,
+          "Russian":1
+        }
+      }
+    }
+  },
+  "Forms":{
+    "SettingWindow":{
+      "x":556,
+      "y":251,
+      "Width":636,
+      "Height":479
+    },
+    "ApplicationWindow":{
+      "x":387,
+      "y":225,
+      "Width":1083,
+      "Height":632
+    }
+  }
+}
