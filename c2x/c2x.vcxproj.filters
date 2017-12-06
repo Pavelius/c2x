@@ -31,9 +31,6 @@
     <ClInclude Include="io.h">
       <Filter>Поддержка</Filter>
     </ClInclude>
-    <ClInclude Include="evalue.h">
-      <Filter>Компилятор</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="collection.cpp">
@@ -90,7 +87,7 @@
     <ClCompile Include="genstate.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>
-    <ClCompile Include="segment.cpp">
+    <ClCompile Include="section.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>
   </ItemGroup>

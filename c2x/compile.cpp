@@ -3,21 +3,19 @@
 using namespace c2;
 int	c2::errors;
 
+static void logical_or(evalue& e1);
+static void parse_module(symbol* member);
+static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
+
 static struct parser_state {
 	const char*		p;
 } ps;
 
-scope_state c2::scope;
-
-scope_state::scope_state() {
-	*this = scope;
+scope_state::scope_state() : scope_state(scope) {
 	if(this != &scope)
 		scope.parent = this;
-	visibility = ps.p;
-}
-
-scope_state::~scope_state() {
-	scope = *this;
+	scope.member = getmodule();
+	scope.visibility = ps.p;
 }
 
 void c2::error(message_s id, ...) {
@@ -58,13 +56,14 @@ static int label() {
 	return 0;
 }
 
-static void addr32(int v, symbol* sym) {
+static void addr32(int v, symbol* sym, section* sec) {
 	auto s = 4;
-	//while(s > 0) {
-	//	segments[Data]->add((unsigned char)(v & 255));
-	//	v >>= 8;
-	//	s--;
-	//}
+	while(s > 0) {
+		if(sec)
+			sec->add((unsigned char)(v & 255));
+		v >>= 8;
+		s--;
+	}
 }
 
 static void calling(symbol* sym, evalue* parameters, int count) {
@@ -261,21 +260,58 @@ static const char* identifier() {
 	return temp;
 }
 
-//static void expression(evalue& e1) {
-//	logical_or(e1);
-//	while(*ps.p == '?') {
-//		next(ps.p + 1);
-//		int i = jumpforward();
-//		expression(e1);
-//		skip(':');
-//		int f = testcondition(1);
-//		label(i);
-//		evalue e2;
-//		expression(e1);
-//		label(f);
-//	}
-//}
-//
+static void expression(evalue& e1) {
+	logical_or(e1);
+	while(*ps.p == '?') {
+		next(ps.p + 1);
+		int i = jumpforward();
+		expression(e1);
+		skip(':');
+		int f = testcondition(1);
+		label(i);
+		evalue e2;
+		expression(e1);
+		label(f);
+	}
+}
+
+static void expression() {
+	evalue e1;
+	expression(e1);
+}
+
+static void expression_nocode() {
+	genstate push;
+	gen.code = false;
+	evalue e1;
+	expression(e1);
+}
+
+static int expression_const() {
+	genstate push;
+	gen.code = false;
+	evalue e1;
+	expression(e1);
+	if(!e1.isconst())
+		status(ErrorNeedConstantExpression);
+	return e1.offset;
+}
+
+static symbol* expression_const_type() {
+	genstate push;
+	gen.code = false;
+	evalue e1;
+	expression(e1);
+	if(!e1.isconst())
+		status(ErrorNeedConstantExpression);
+	auto result = e1.sym;
+	if(!result || !result->istype())
+		result = e1.result;
+	return result;
+}
+
+static int test_01[] = {0, {2}};
+
 static bool istype(symbol** declared, unsigned& flags) {
 	auto e = i32;
 	bool result = false;
@@ -328,151 +364,82 @@ static bool istype(symbol** declared, unsigned& flags) {
 	return result;
 }
 
-//static void initialize(symbol* sym) {
-//	if(sym->count && *ps.p == '{') {
-//		next(ps.p + 1);
-//		if(sym->count == -1) {
-//			sym->count = 0;
-//			while(true) {
-//				sym->count++;
-//				initialize(sym->result);
-//				if(*ps.p == '}')
-//					break;
-//				skip(',');
-//				if(*ps.p == '}')
-//					break;
-//			}
-//		} else {
-//			unsigned i = 0;
-//			while(true) {
-//				if(i++ >= sym->count) {
-//					genstate push;
-//					gen.code = false;
-//					initialize(sym->result);
-//				} else
-//					initialize(sym->result);
-//				if(*ps.p == '}')
-//					break;
-//				skip(',');
-//				if(*ps.p == '}')
-//					break;
-//			}
-//			if(i >= sym->count)
-//				status(ErrorArrayOverflow, i, sym->count);
-//		}
-//		skip('}');
-//	} else {
-//		auto t = sym->getchild();
-//		if(t) {
-//			skip('{');
-//			while(t) {
-//				if(t->ismember() && !t->ismethod()) {
-//					initialize(t);
-//					if(*ps.p == '}')
-//						break;
-//					skip(',');
-//					if(*ps.p == '}')
-//						break;
-//				}
-//				t = t->getnext(sym);
-//			}
-//			while(t) {
-//				if(t->ismember() && !t->ismethod()) {
-//					//
-//				}
-//				t = t->getnext(sym);
-//			}
-//			skip(',');
-//		} else if(sym->ispointer()) {
-//			evalue e1;
-//			expression(e1);
-//			if(!e1.isconst())
-//				status(ErrorNeedConstantExpression);
-//			addr32(e1.offset, e1.sym);
-//		} else if(sym->result)
-//			initialize(sym->result);
-//		else {
-//			// simple type
-//			int s = sym->size;
-//			int v = expression_const();
-//			while(s > 0) {
-//				segments[Data]->add((unsigned char)(v & 255));
-//				v >>= 8;
-//				s--;
-//			}
-//		}
-//	}
-//}
-//
-//static int get_stack_frame(symbol* variable) {
-//	return 8;
-//}
-//
-//static void instance(symbol* variable, bool allow_assigment) {
-//	bool was_initialized = (*ps.p == '=');
-//	if(variable->ismethod()) {
-//		status(ErrorExpected1p, "variable instance");
-//		return;
-//	} else if(variable->isstatic()) {
-//		// Статические перменные могут распологаться в секции инициализированных данных
-//		// или не инициализированных. Вычисляем это по знаку равно.
-//		if(gen.code) {
-//			if(was_initialized)
-//				variable->value = segments[Data]->get();
-//			else
-//				variable->value = segments[DataUninitialized]->get();
-//		}
-//	} else if(variable->ismethodparam()) {
-//		// Параметры функция расчитать довольно просто.
-//		// Возьмем последний и добавим его размер.
-//		auto parent = variable->parent;
-//		for(auto p = parent->getchild(); p; ) {
-//			if(!p->ismethodparam())
-//				break;
-//			auto p1 = p->getnext(parent);
-//			if(p1 == variable) {
-//				variable->value = p->value + (p->size + 3) & 0xFFFFFFFC;
-//				break;
-//			}
-//			p = p1;
-//		}
-//	} else if(variable->islocal()) {
-//		// Локальные параметры также расчитать довольно просто.
-//		// Возьмем последний и вычтим его размер, так как локальные переменные растут вниз.
-//		if(locals.count) {
-//			auto p = locals.data[locals.count - 1];
-//			variable->value = p->value - ((p->size + 3) & 0xFFFFFFFC);
-//		}
-//		locals.add(variable);
-//	} else {
-//		// На статические члены модуля имеют смещение относительно самого модуля.
-//		// Возьмем последний и добавим его размер.
-//		auto p = variable->getprevious();
-//		if(p)
-//			variable->value = p->value + p->size;
-//		// Не статическая переменная не может быть инициализирована значением по-умолчанию
-//		if(*ps.p == '=')
-//			status(ErrorInvalid1p2pIn3p, "operator", "=", "after static variable");
-//	}
-//	if(*ps.p == '=') {
-//		next(ps.p + 1);
-//		if(allow_assigment && *ps.p != '{') {
-//			evalue e1; e1.set(variable);
-//			evalue e2(&e1);
-//			assigment(e2);
-//			binary_operation(e2, '=');
-//			return;
-//		}
-//		initialize(variable);
-//	}
-//	// Вычислим размер текущего элемента
-//	variable->size = variable->result->size*variable->count;
-//	if(variable->parent->istype()) {
-//		// Если это тип и не статический модуль добавим размер элемента.
-//		if(!variable->ismethodparam() && !variable->islocal() && !variable->ismethod() && !variable->is(Static))
-//			variable->parent->size = variable->value + variable->size;
-//	}
-//}
+static void initialize(symbol* sym, section* sec) {
+	if(sym->isarray() && *ps.p == '{') {
+		// Array case.
+		next(ps.p + 1);
+		if(sym->count == 0xFFFFFFFF) {
+			// When size of array is unknown.
+			sym->count = 0;
+			while(true) {
+				sym->count++;
+				initialize(sym->result, sec);
+				if(*ps.p == '}')
+					break;
+				skip(',');
+				if(*ps.p == '}')
+					break;
+			}
+		} else {
+			// When size of array is known and we need add emphty elements to the end.
+			unsigned i = 0;
+			while(true) {
+				if(i++ >= sym->count) {
+					genstate push;
+					gen.code = false;
+					initialize(sym->result, sec);
+				} else
+					initialize(sym->result, sec);
+				if(*ps.p == '}')
+					break;
+				skip(',');
+				if(*ps.p == '}')
+					break;
+			}
+			if(i >= sym->count)
+				status(ErrorArrayOverflow, i, sym->count);
+		}
+		skip('}');
+	} else if(sym->result && sym->result->ispointer()) {
+		evalue e1;
+		expression(e1);
+		if(!e1.isconst())
+			status(ErrorNeedConstantExpression);
+		addr32(e1.offset, e1.sym, sec);
+	} else if(sym->result) {
+		initialize(sym->result, sec);
+	} else {
+		if(*ps.p == '{') {
+			skip('{');
+			auto t = sym->getchild();
+			while(t) {
+				if(t->ismember() && !t->isfunction()) {
+					initialize(t, sec);
+					if(*ps.p == '}')
+						break;
+					skip(',');
+					if(*ps.p == '}')
+						break;
+				}
+				t = t->getnext(sym);
+			}
+		} else {
+			// simple type
+			int s = sym->size;
+			int v = expression_const();
+			while(s > 0) {
+				if(sec)
+					sec->add((unsigned char)(v & 255));
+				v >>= 8;
+				s--;
+			}
+		}
+	}
+}
+
+static int get_stack_frame(symbol* variable) {
+	return 8;
+}
 
 static symbol* parse_pointer(symbol* declared) {
 	while(*ps.p == '*') {
@@ -482,9 +449,541 @@ static symbol* parse_pointer(symbol* declared) {
 	return declared;
 }
 
-static bool declaration(unsigned flags, bool allow_functions = true, bool allow_variables = true, bool allow_dynamic_isntance = false) {
+static bool direct_cast(evalue& e1) {
+	symbol* declared;
+	unsigned flags = 0;
+	const char* p1 = ps.p;
+	if(!istype(&declared, flags))
+		return false;
+	declared = parse_pointer(declared);
+	if(*ps.p != ')') {
+		ps.p = p1;
+		return false;
+	}
+	next(ps.p + 1);
+	e1.result = declared;
+	return true;
+}
+
+static char next_string_symbol() {
+	while(*ps.p) {
+		if(*ps.p != '\\')
+			return *ps.p++;
+		ps.p++;
+		switch(*ps.p++) {
+		case 0:
+			return 0;
+		case 'n':
+			return '\n';
+		case 't':
+			return '\t';
+		case 'r':
+			return '\r';
+		case '\\':
+			return '\\';
+		case '\'':
+			return '\'';
+		case '\"':
+			return '\"';
+		case '\n':
+			if(ps.p[0] == '\r')
+				ps.p++;
+			break;
+		case '\r':
+			if(ps.p[0] == '\n')
+				ps.p++;
+			break;
+		default:
+		{
+			char temp[2] = {ps.p[-1], 0};
+			status(ErrorInvalidEscapeSequence, temp);
+		}
+		break;
+		}
+	}
+	return 0;
+}
+
+static int next_char() {
+	char result[5];
+	char* d1 = result;
+	char* d2 = result + sizeof(result) / sizeof(result[0]) - 1;
+	memset(result, 0, sizeof(result));
+	while(*ps.p) {
+		if(*ps.p == '\'') {
+			next(ps.p + 1);
+			break;
+		}
+		if(d1 < d2)
+			*d1++ = next_string_symbol();
+	}
+	*d1++ = 0;
+	return *((int*)&result);
+}
+
+static int get_string(const char* temp) {
+	int result = section::find(section_strings)->get();
+	for(auto p = temp; *p; p++)
+		section::find(section_strings)->add((unsigned char)*p);
+	section::find(section_strings)->add(0);
+	return result;
+}
+
+static int next_string() {
+	static char temp_buffer[256 * 256];
+	auto pb = temp_buffer;
+	auto pe = pb + sizeof(temp_buffer) - 2;
+	while(*ps.p) {
+		if(*ps.p == '\"') {
+			next(ps.p + 1);
+			if(*ps.p == '\"') {
+				// if two string in row
+				next(ps.p + 1);
+				continue;
+			} else if(*ps.p == '+' && ps.p[1] != '+') {
+				// checking '+' between two strings
+				const char* p1 = ps.p;
+				next(ps.p + 1);
+				if(*ps.p == '\"') {
+					next(ps.p + 1);
+					continue;
+				}
+				ps.p = p1;
+			}
+			break;
+		}
+		auto sym = next_string_symbol();
+		if(pb < pe)
+			*pb++ = sym;
+	}
+	*pb = 0;
+	return get_string(temp_buffer);
+}
+
+static int next_number() {
+	int num = 0;
+	if(ps.p[0] == '0') {
+		if(ps.p[1] == 'x') {
+			ps.p += 2;
+			while(true) {
+				char s = *ps.p;
+				if(s >= 'a' && s <= 'f')
+					s = s - 'a' + 10;
+				else if(s >= 'A' && s <= 'F')
+					s = s - 'A' + 10;
+				else if(s >= '0' && s <= '9')
+					s = s - '0';
+				else
+					break;
+				num = num * 16 + s;
+				ps.p++;
+			}
+		} else {
+			while(*ps.p >= '0' && *ps.p <= '7') {
+				num = num * 8 + *ps.p - '0';
+				ps.p++;
+			}
+		}
+	} else {
+		while(*ps.p >= '0' && *ps.p <= '9') {
+			num = num * 10 + *ps.p - '0';
+			ps.p++;
+		}
+	}
+	if(*ps.p == 'f' || *ps.p == 'e')
+		ps.p++;
+	next(ps.p);
+	return num;
+}
+
+static void function_call(evalue& e1) {
+	auto sym = e1.sym;
+	if(!sym->isfunction())
+		status(ErrorNeedFunctionMember, sym->getname());
+	skip('(');
+	int	count = 0;
+	evalue parameters[96];
+	while(*ps.p) {
+		if(*ps.p == ')') {
+			next(ps.p + 1);
+			break;
+		}
+		parameters[count].clear();
+		parameters[count].next = (count ? &parameters[count - 1] : &e1);
+		expression(parameters[count]);
+		count++;
+		if(*ps.p == ')') {
+			next(ps.p + 1);
+			break;
+		}
+		skip(',');
+	}
+	// default parameters
+	// parameters back order
+	for(int i = 0; i < count; i++) {
+		//gen::param();
+		//gen::pop();
+	}
+	//if(sym->getparametercount() != count)
+	//	status(ErrorWrongParamNumber, sym->id, sym->getparametercount(), count);
+	calling(sym, parameters, count);
+	// function return value
+	e1.reg = Eax;
+	e1.offset = 0;
+	e1.sym = 0;
+}
+
+static void postfix(evalue& e1) {
+	while(*ps.p) {
+		if(*ps.p == '(')
+			function_call(e1);
+		else if(*ps.p == '.') {
+			next(ps.p + 1);
+			const char* n = szdup(identifier());
+			if(e1.result->ispointer())
+				e1.dereference();
+			e1.getrvalue();
+			symbol* sym = 0;
+			if(*ps.p == '(') {
+				sym = findsymbol(n, e1.result->visibility, SymbolFunction);
+				if(!sym)
+					sym = addsymbol(n, i32, e1.result, SymbolFunction);
+			} else
+				sym = findsymbol(n, e1.result->visibility, SymbolMember);
+			evalue e2(&e1); e2.set(sym);
+			binary_operation(e2, '.');
+		} else if(*ps.p == '[') {
+			next(ps.p + 1);
+			if(e1.sym && e1.sym->isarray())
+				e1.result = e1.result->reference();
+			if(!e1.result->ispointer())
+				status(ErrorNeedPointerOrArray);
+			evalue e2(&e1);
+			expression(e2);
+			skip(']');
+			binary_operation(e2, '+');
+			e1.getrvalue();
+		} else if(ps.p[0] == '-' && ps.p[1] == '-') {
+			next(ps.p + 2);
+			if(!e1.islvalue())
+				status(ErrorNeedLValue);
+			//gen::dup();
+			//gen::rvalue(-1);
+			evalue e2(&e1); e2.set(1);
+			binary_operation(e2, '=', '-');
+			//gen::pop();
+		} else if(ps.p[0] == '+' && ps.p[1] == '+') {
+			next(ps.p + 2);
+			if(!e1.islvalue())
+				status(ErrorNeedLValue);
+			//gen::dup();
+			//gen::rvalue(-1);
+			evalue e2(&e1); e2.set(1);
+			binary_operation(e2, '=', '+');
+			//gen::pop();
+		} else
+			break;
+	}
+}
+
+static void register_used_symbol(symbol* sym) {
+	if(!gen.methods)
+		return;
+	//for(auto p : used_symbols) {
+	//	if(p == sym)
+	//		return;
+	//}
+	//used_symbols.reserve();
+	//used_symbols.add(sym);
+}
+
+static void unary(evalue& e1) {
+	switch(ps.p[0]) {
+	case '-':
+		ps.p++;
+		if(ps.p[0] == '-') {
+			next(ps.p + 1);
+			unary(e1);
+			evalue e2(&e1); e2.set(1);
+			binary_operation(e2, '=', '-');
+		} else {
+			next(ps.p + 1);
+			unary(e1);
+			unary_operation(e1, '-');
+		}
+		break;
+	case '+':
+		ps.p++;
+		if(ps.p[0] == '+') {
+			next(ps.p + 1);
+			unary(e1);
+			evalue e2(&e1); e2.set(1);
+			binary_operation(e2, '=', '+');
+		} else {
+			next(ps.p + 1);
+			unary(e1);
+		}
+		break;
+	case '!':
+		next(ps.p + 1);
+		unary(e1);
+		unary_operation(e1, '!');
+		break;
+	case '*':
+		next(ps.p + 1);
+		unary(e1);
+		unary_operation(e1, '*');
+		break;
+	case '&':
+		next(ps.p + 1);
+		unary(e1);
+		unary_operation(e1, '&');
+		break;
+	case '(':
+		if(!direct_cast(e1)) {
+			next(ps.p + 1);
+			evalue e2(&e1);
+			expression(e2);
+			skip(')');
+		}
+		break;
+	case '\"':
+		ps.p++;
+		e1.set(next_string());
+		e1.result = i8[0].reference();
+		break;
+	case '\'':
+		ps.p++;
+		e1.set(next_string());
+		e1.result = i8;
+		break;
+	case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
+		e1.set(next_number());
+		break;
+	default:
+		if(match("sizeof")) {
+			skip('(');
+			c2::symbol* sym = expression_const_type();
+			e1.set(sym->size);
+			skip(')');
+		} else if(match("this"))
+			e1.set(scope.getmodule());
+		else if(match("true"))
+			e1.set(1);
+		else if(match("false"))
+			e1.set(0);
+		else if(ischa(*ps.p)) {
+			const char* n = szdup(identifier());
+			c2::symbol* sym = findsymbol(n);
+			if(!sym)
+				status(ErrorNotFound1p2p, "identifier", n);
+			else
+				register_used_symbol(sym);
+			e1.set(sym);
+		}
+		break;
+	}
+	postfix(e1);
+}
+
+static void multiplication(evalue& e1) {
+	unary(e1);
+	while((ps.p[0] == '*' || ps.p[0] == '/' || ps.p[0] == '%') && ps.p[1] != '=') {
+		char s = ps.p[0];
+		next(ps.p + 1);
+		evalue e2(&e1);
+		unary(e2);
+		//gen::cast();
+		binary_operation(e2, s);
+	}
+}
+
+static void addiction(evalue& e1) {
+	multiplication(e1);
+	while((ps.p[0] == '+' || ps.p[0] == '-') && ps.p[1] != '=') {
+		char s = ps.p[0];
+		next(ps.p + 1);
+		evalue e2(&e1);
+		multiplication(e2);
+		//gen::cast();
+		binary_operation(e2, s);
+	}
+}
+
+static void binary_cond(evalue& e1) {
+	addiction(e1);
+	while((ps.p[0] == '>' && ps.p[1] != '>')
+		|| (ps.p[0] == '<' && ps.p[1] != '<')
+		|| (ps.p[0] == '=' && ps.p[1] == '=')
+		|| (ps.p[0] == '!' && ps.p[1] == '=')) {
+		char t1 = *ps.p++;
+		char t2 = 0;
+		if(ps.p[0] == '=')
+			t2 = *ps.p++;
+		next(ps.p);
+		evalue e2(&e1);
+		addiction(e2);
+		//gen::cast();
+		binary_operation(e2, t1, t2);
+	}
+}
+
+static void binary_and(evalue& e1) {
+	binary_cond(e1);
+	while(ps.p[0] == '&' && ps.p[1] != '&') {
+		next(ps.p + 2);
+		evalue e2(&e1);
+		binary_cond(e2);
+		//gen::cast();
+		binary_operation(e2, '&');
+	}
+}
+
+static void binary_xor(evalue& e1) {
+	binary_and(e1);
+	while(ps.p[0] == '^') {
+		next(ps.p + 1);
+		evalue e2(&e1);
+		binary_and(e2);
+		//gen::cast();
+		binary_operation(e2, '^');
+	}
+}
+
+static void binary_or(evalue& e1) {
+	binary_xor(e1);
+	while(ps.p[0] == '|' && ps.p[1] != '|') {
+		next(ps.p + 1);
+		evalue e2(&e1);
+		binary_or(e2);
+		//gen::cast();
+		binary_operation(e2, '|');
+	}
+}
+
+static void binary_shift(evalue& e1) {
+	binary_or(e1);
+	while((ps.p[0] == '>' && ps.p[1] == '>') || (ps.p[0] == '<' && ps.p[1] == '<')) {
+		char t1 = ps.p[0];
+		char t2 = ps.p[1];
+		next(ps.p + 2);
+		evalue e2(&e1);
+		binary_or(e2);
+		//gen::cast();
+		binary_operation(e2, t1, t2);
+	}
+}
+
+static void logical_and(evalue& e1) {
+	binary_shift(e1);
+	int t = 0;
+	bool was = false;
+	while(ps.p[0] == '&' && ps.p[1] == '&') {
+		next(ps.p + 2);
+		t = testcondition(1, t);
+		evalue e2(&e1);
+		binary_shift(e2);
+		was = true;
+	}
+	//if(was)
+	//	gen::pushl(FJmpI, t);
+}
+
+static void logical_or(evalue& e1) {
+	logical_and(e1);
+	int t = 0;
+	bool was = false;
+	while(ps.p[0] == '|' && ps.p[1] == '|') {
+		next(ps.p + 2);
+		t = testcondition(0, t);
+		evalue e2(&e1);
+		logical_and(e2);
+		was = true;
+	}
+	//if(was)
+	//	gen::pushl(FJmp, t);
+}
+
+static void assigment(evalue& e1) {
+	expression(e1);
+	if((ps.p[0] == '=' && ps.p[1] != '=')
+		|| ((ps.p[0] == '+' || ps.p[0] == '-' || ps.p[0] == '/' || ps.p[0] == '*') && ps.p[1] == '=')) {
+		char t2 = *ps.p++;
+		char t1 = '=';
+		if(t2 == '=')
+			t2 = 0;
+		next(ps.p + 1);
+		evalue e2(&e1);
+		assigment(e2);
+		binary_operation(e2, t1, t2);
+	}
+}
+
+static void assigment() {
+	evalue e1;
+	assigment(e1);
+}
+
+static unsigned align_symbol_offset(unsigned start, unsigned size, bool negative_rellocate, int align_size) {
+	if(align_size > 1)
+		size = ((size + 3) & 0xFFFFFFFC);
+	if(negative_rellocate)
+		return start - size;
+	else
+		return start + size;
+}
+
+static void instance(symbol* variable, bool runtime_assigment, bool allow_assigment, bool locale_variable, int align_size) {
+	bool was_initialized = (*ps.p == '=');
+	if(variable->isfunction()) {
+		status(ErrorExpected1p, "variable instance");
+		return;
+	} else if(variable->isstatic()) {
+		// Static members can be in initialized section or uninitialized.
+		// Predict this by assigment passed after initialization.
+		if(gen.code) {
+			if(was_initialized)
+				variable->section = section::find(section_data);
+			else
+				variable->section = section::find(section_bbs);
+		}
+	} else {
+		// This is not static member case. Can be local variable, function parameter or module member.
+		// Get last element in this visible scope and add his size to calculate base of this element.
+		// In case when there is no previous member initialize to zero.
+		auto p = variable->getprevious();
+		if(p && p != scope.getmodule())
+			variable->value = align_symbol_offset(p->value, p->getsize(), locale_variable, align_size);
+		else
+			variable->value = 0;
+	}
+	if(*ps.p == '=') {
+		if(!allow_assigment)
+			status(ErrorInvalid1p2pIn3p, "operator", "=", "after static variable");
+		next(ps.p + 1);
+		if(runtime_assigment && *ps.p != '{') {
+			evalue e1; e1.set(variable);
+			evalue e2(&e1);
+			assigment(e2);
+			binary_operation(e2, '=');
+			return;
+		}
+		initialize(variable, variable->section);
+	}
+	// Calculate size of single module element. Get size from type of expression.
+	variable->size = variable->result->size;
+	if(variable->parent->istype()) {
+		// Module member change size of his parent.
+		if(!variable->isstatic() && variable->ismember())
+			variable->parent->size = variable->value + variable->size;
+	}
+}
+
+static bool declaration(unsigned flags, bool allow_functions, bool allow_variables, bool runtime_isntance, bool allow_assigment, bool locale_variable, int align_size = 0) {
 	symbol* declared;
 	const char* p1 = ps.p;
+	if(align_size == 0)
+		align_size = 4;
 	if(!istype(&declared, flags))
 		return false;
 	while(*ps.p) {
@@ -515,8 +1014,8 @@ static bool declaration(unsigned flags, bool allow_functions = true, bool allow_
 				if(istype(&result, pflags)) {
 					result = parse_pointer(result);
 					auto id = szdup(identifier());
-					result = addsymbol(id, result, scope.member, SymbolParameter);
-					//instance(result, false);
+					result = addsymbol(id, result, scope.member, SymbolMember);
+					instance(result, false, false, false, 4);
 					m2->count++;
 				}
 				if(*ps.p == ')') {
@@ -531,7 +1030,7 @@ static bool declaration(unsigned flags, bool allow_functions = true, bool allow_
 			} else {
 				scope_state push;
 				prologue(m2);
-				//statement(0, 0, 0, 0);
+				statement(0, 0, 0, 0);
 				retproc(m2);
 				epilogue(m2);
 			}
@@ -544,11 +1043,11 @@ static bool declaration(unsigned flags, bool allow_functions = true, bool allow_
 				if(*ps.p != '=')
 					m2->count = 0;
 			} else {
-				//m2->count = expression_const();
+				m2->count = expression_const();
 				skip(']');
 			}
 		}
-		//instance(m2, allow_dynamic_isntance);
+		instance(m2, runtime_isntance, allow_assigment, locale_variable, align_size);
 		if(*ps.p == ';') {
 			next(ps.p + 1);
 			break;
@@ -558,668 +1057,172 @@ static bool declaration(unsigned flags, bool allow_functions = true, bool allow_
 	return true;
 }
 
-//static bool direct_cast(evalue& e1) {
-//	symbol* declared;
-//	unsigned flags = 0;
-//	const char* p1 = ps.p;
-//	if(!istype(&declared, flags))
-//		return false;
-//	declared = parse_pointer(declared);
-//	if(*ps.p != ')') {
-//		ps.p = p1;
-//		return false;
-//	}
-//	next(ps.p + 1);
-//	e1.result = declared;
-//	return true;
-//}
-//
-//static char next_string_symbol() {
-//	while(*ps.p) {
-//		if(*ps.p != '\\')
-//			return *ps.p++;
-//		ps.p++;
-//		switch(*ps.p++) {
-//		case 0:
-//			return 0;
-//		case 'n':
-//			return '\n';
-//		case 't':
-//			return '\t';
-//		case 'r':
-//			return '\r';
-//		case '\\':
-//			return '\\';
-//		case '\'':
-//			return '\'';
-//		case '\"':
-//			return '\"';
-//		case '\n':
-//			if(ps.p[0] == '\r')
-//				ps.p++;
-//			break;
-//		case '\r':
-//			if(ps.p[0] == '\n')
-//				ps.p++;
-//			break;
-//		default:
-//		{
-//			char temp[2] = {ps.p[-1], 0};
-//			status(ErrorInvalidEscapeSequence, temp);
-//		}
-//		break;
-//		}
-//	}
-//	return 0;
-//}
-//
-//static int next_char() {
-//	char result[5];
-//	char* d1 = result;
-//	char* d2 = result + sizeof(result) / sizeof(result[0]) - 1;
-//	memset(result, 0, sizeof(result));
-//	while(*ps.p) {
-//		if(*ps.p == '\'') {
-//			next(ps.p + 1);
-//			break;
-//		}
-//		if(d1 < d2)
-//			*d1++ = next_string_symbol();
-//	}
-//	*d1++ = 0;
-//	return *((int*)&result);
-//}
-//
-//static int get_string(const char* temp) {
-//	int result = segments[DataStrings]->get();
-//	for(auto p = temp; *p; p++)
-//		segments[DataStrings]->add((unsigned char)*p);
-//	segments[DataStrings]->add(0);
-//	return result;
-//}
-//
-//static int next_string() {
-//	static char temp_buffer[256 * 256];
-//	auto pb = temp_buffer;
-//	auto pe = pb + sizeof(temp_buffer) - 2;
-//	while(*ps.p) {
-//		if(*ps.p == '\"') {
-//			next(ps.p + 1);
-//			if(*ps.p == '\"') {
-//				// if two string in row
-//				next(ps.p + 1);
-//				continue;
-//			} else if(*ps.p == '+' && ps.p[1] != '+') {
-//				// checking '+' between two strings
-//				const char* p1 = ps.p;
-//				next(ps.p + 1);
-//				if(*ps.p == '\"') {
-//					next(ps.p + 1);
-//					continue;
-//				}
-//				ps.p = p1;
-//			}
-//			break;
-//		}
-//		auto sym = next_string_symbol();
-//		if(pb < pe)
-//			*pb++ = sym;
-//	}
-//	*pb = 0;
-//	return get_string(temp_buffer);
-//}
-//
-//static int next_number() {
-//	int num = 0;
-//	if(ps.p[0] == '0') {
-//		if(ps.p[1] == 'x') {
-//			ps.p += 2;
-//			while(true) {
-//				char s = *ps.p;
-//				if(s >= 'a' && s <= 'f')
-//					s = s - 'a' + 10;
-//				else if(s >= 'A' && s <= 'F')
-//					s = s - 'A' + 10;
-//				else if(s >= '0' && s <= '9')
-//					s = s - '0';
-//				else
-//					break;
-//				num = num * 16 + s;
-//				ps.p++;
-//			}
-//		} else {
-//			while(*ps.p >= '0' && *ps.p <= '7') {
-//				num = num * 8 + *ps.p - '0';
-//				ps.p++;
-//			}
-//		}
-//	} else {
-//		while(*ps.p >= '0' && *ps.p <= '9') {
-//			num = num * 10 + *ps.p - '0';
-//			ps.p++;
-//		}
-//	}
-//	if(*ps.p == 'f' || *ps.p == 'e')
-//		ps.p++;
-//	next(ps.p);
-//	return num;
-//}
-//
-//static void function_call(evalue& e1) {
-//	auto sym = e1.sym;
-//	if(!sym->ismethod())
-//		status(ErrorNeedFunctionMember);
-//	skip('(');
-//	int	count = 0;
-//	evalue parameters[96];
-//	while(*ps.p) {
-//		if(*ps.p == ')') {
-//			next(ps.p + 1);
-//			break;
-//		}
-//		parameters[count].clear();
-//		parameters[count].next = (count ? &parameters[count - 1] : &e1);
-//		expression(parameters[count]);
-//		count++;
-//		if(*ps.p == ')') {
-//			next(ps.p + 1);
-//			break;
-//		}
-//		skip(',');
-//	}
-//	// default parameters
-//	// parameters back order
-//	for(int i = 0; i < count; i++) {
-//		//gen::param();
-//		//gen::pop();
-//	}
-//	if(sym->getparametercount() != count)
-//		status(ErrorWrongParamNumber, sym->id, sym->getparametercount(), count);
-//	calling(sym, parameters, count);
-//	// function return value
-//	e1.reg = Eax;
-//	e1.offset = 0;
-//	e1.sym = 0;
-//}
-//
-//static symbol* forward_declare(symbol* sym, symbol* parent, const char* id) {
-//	if(sym || !id || !parent)
-//		return sym;
-//	if(*ps.p != '(') {
-//		// Не найдена переменная
-//		status(ErrorCantFind1pWithName2p, "variable", id);
-//		return 0;
-//	}
-//	sym = parent->create(id, type::i32, 0);
-//	sym->setmethod();
-//	return sym;
-//}
-//
-//static void postfix(evalue& e1) {
-//	while(*ps.p) {
-//		if(*ps.p == '(')
-//			function_call(e1);
-//		else if(*ps.p == '.') {
-//			next(ps.p + 1);
-//			const char* n = szdup(identifier());
-//			if(e1.result->ispointer())
-//				e1.dereference();
-//			e1.getrvalue();
-//			auto sym = forward_declare(e1.result->findmembers(n), e1.result, n);
-//			evalue e2(&e1); e2.set(sym);
-//			binary_operation(e2, '.');
-//		} else if(*ps.p == '[') {
-//			next(ps.p + 1);
-//			if(e1.sym && e1.sym->isarray())
-//				e1.result = e1.result->reference();
-//			if(!e1.result->ispointer())
-//				status(ErrorNeedPointerOrArray);
-//			evalue e2(&e1);
-//			expression(e2);
-//			skip(']');
-//			binary_operation(e2, '+');
-//			e1.getrvalue();
-//		} else if(ps.p[0] == '-' && ps.p[1] == '-') {
-//			next(ps.p + 2);
-//			if(!e1.islvalue())
-//				status(ErrorNeedLValue);
-//			//gen::dup();
-//			//gen::rvalue(-1);
-//			evalue e2(&e1); e2.set(1);
-//			binary_operation(e2, '=', '-');
-//			//gen::pop();
-//		} else if(ps.p[0] == '+' && ps.p[1] == '+') {
-//			next(ps.p + 2);
-//			if(!e1.islvalue())
-//				status(ErrorNeedLValue);
-//			//gen::dup();
-//			//gen::rvalue(-1);
-//			evalue e2(&e1); e2.set(1);
-//			binary_operation(e2, '=', '+');
-//			//gen::pop();
-//		} else
-//			break;
-//	}
-//}
-//
-//static void register_used_symbol(symbol* sym) {
-//	if(!gen.methods)
-//		return;
-//	for(auto p : used_symbols) {
-//		if(p == sym)
-//			return;
-//	}
-//	used_symbols.reserve();
-//	used_symbols.add(sym);
-//}
-//
-//static void unary(evalue& e1) {
-//	switch(ps.p[0]) {
-//	case '-':
-//		ps.p++;
-//		if(ps.p[0] == '-') {
-//			next(ps.p + 1);
-//			unary(e1);
-//			evalue e2(&e1); e2.set(1);
-//			binary_operation(e2, '=', '-');
-//		} else {
-//			next(ps.p + 1);
-//			unary(e1);
-//			unary_operation(e1, '-');
-//		}
-//		break;
-//	case '+':
-//		ps.p++;
-//		if(ps.p[0] == '+') {
-//			next(ps.p + 1);
-//			unary(e1);
-//			evalue e2(&e1); e2.set(1);
-//			binary_operation(e2, '=', '+');
-//		} else {
-//			next(ps.p + 1);
-//			unary(e1);
-//		}
-//		break;
-//	case '!':
-//		next(ps.p + 1);
-//		unary(e1);
-//		unary_operation(e1, '!');
-//		break;
-//	case '*':
-//		next(ps.p + 1);
-//		unary(e1);
-//		unary_operation(e1, '*');
-//		break;
-//	case '&':
-//		next(ps.p + 1);
-//		unary(e1);
-//		unary_operation(e1, '&');
-//		break;
-//	case '(':
-//		if(!direct_cast(e1)) {
-//			next(ps.p + 1);
-//			evalue e2(&e1);
-//			expression(e2);
-//			skip(')');
-//		}
-//		break;
-//	case '\"':
-//		ps.p++;
-//		e1.set(next_string());
-//		e1.result = type::i8[0].reference();
-//		break;
-//	case '\'':
-//		ps.p++;
-//		e1.set(next_string());
-//		e1.result = type::i8;
-//		break;
-//	case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
-//		e1.set(next_number());
-//		break;
-//	default:
-//		if(match("sizeof")) {
-//			skip('(');
-//			c2::symbol* sym = expression_const_type();
-//			e1.set(sym->size);
-//			skip(')');
-//		} else if(match("this"))
-//			e1.set(ps.module);
-//		else if(match("true"))
-//			e1.set(1);
-//		else if(match("false"))
-//			e1.set(0);
-//		else if(ischa(*ps.p)) {
-//			const char* n = szdup(identifier());
-//			c2::symbol* sym = 0;
-//			if(!sym) {
-//				// Find local symbols
-//				for(int i = locals.count - 1; i >= 0; i--) {
-//					if(strcmp(locals.data[i]->id, n) == 0) {
-//						sym = locals.data[i];
-//						break;
-//					}
-//				}
-//			}
-//			if(!sym && ps.member)
-//				sym = ps.member->findmembers(n);
-//			if(!sym && ps.module)
-//				sym = ps.module->findmembers(n);
-//			if(!sym && ps.module)
-//				sym = ps.module->findmembertype(n);
-//			if(!sym)
-//				status(ErrorNotFound1p2p, "identifier", n);
-//			register_used_symbol(sym);
-//			e1.set(sym);
-//		}
-//		break;
-//	}
-//	postfix(e1);
-//}
-//
-//static void multiplication(evalue& e1) {
-//	unary(e1);
-//	while((ps.p[0] == '*' || ps.p[0] == '/' || ps.p[0] == '%') && ps.p[1] != '=') {
-//		char s = ps.p[0];
-//		next(ps.p + 1);
-//		evalue e2(&e1);
-//		unary(e2);
-//		//gen::cast();
-//		binary_operation(e2, s);
-//	}
-//}
-//
-//static void addiction(evalue& e1) {
-//	multiplication(e1);
-//	while((ps.p[0] == '+' || ps.p[0] == '-') && ps.p[1] != '=') {
-//		char s = ps.p[0];
-//		next(ps.p + 1);
-//		evalue e2(&e1);
-//		multiplication(e2);
-//		//gen::cast();
-//		binary_operation(e2, s);
-//	}
-//}
-//
-//static void binary_cond(evalue& e1) {
-//	addiction(e1);
-//	while((ps.p[0] == '>' && ps.p[1] != '>')
-//		|| (ps.p[0] == '<' && ps.p[1] != '<')
-//		|| (ps.p[0] == '=' && ps.p[1] == '=')
-//		|| (ps.p[0] == '!' && ps.p[1] == '=')) {
-//		char t1 = *ps.p++;
-//		char t2 = 0;
-//		if(ps.p[0] == '=')
-//			t2 = *ps.p++;
-//		next(ps.p);
-//		evalue e2(&e1);
-//		addiction(e2);
-//		//gen::cast();
-//		binary_operation(e2, t1, t2);
-//	}
-//}
-//
-//static void binary_and(evalue& e1) {
-//	binary_cond(e1);
-//	while(ps.p[0] == '&' && ps.p[1] != '&') {
-//		next(ps.p + 2);
-//		evalue e2(&e1);
-//		binary_cond(e2);
-//		//gen::cast();
-//		binary_operation(e2, '&');
-//	}
-//}
-//
-//static void binary_xor(evalue& e1) {
-//	binary_and(e1);
-//	while(ps.p[0] == '^') {
-//		next(ps.p + 1);
-//		evalue e2(&e1);
-//		binary_and(e2);
-//		//gen::cast();
-//		binary_operation(e2, '^');
-//	}
-//}
-//
-//static void binary_or(evalue& e1) {
-//	binary_xor(e1);
-//	while(ps.p[0] == '|' && ps.p[1] != '|') {
-//		next(ps.p + 1);
-//		evalue e2(&e1);
-//		binary_or(e2);
-//		//gen::cast();
-//		binary_operation(e2, '|');
-//	}
-//}
-//
-//static void binary_shift(evalue& e1) {
-//	binary_or(e1);
-//	while((ps.p[0] == '>' && ps.p[1] == '>') || (ps.p[0] == '<' && ps.p[1] == '<')) {
-//		char t1 = ps.p[0];
-//		char t2 = ps.p[1];
-//		next(ps.p + 2);
-//		evalue e2(&e1);
-//		binary_or(e2);
-//		//gen::cast();
-//		binary_operation(e2, t1, t2);
-//	}
-//}
-//
-//static void logical_and(evalue& e1) {
-//	binary_shift(e1);
-//	int t = 0;
-//	bool was = false;
-//	while(ps.p[0] == '&' && ps.p[1] == '&') {
-//		next(ps.p + 2);
-//		t = testcondition(1, t);
-//		evalue e2(&e1);
-//		binary_shift(e2);
-//		was = true;
-//	}
-//	//if(was)
-//	//	gen::pushl(FJmpI, t);
-//}
-//
-//static void logical_or(evalue& e1) {
-//	logical_and(e1);
-//	int t = 0;
-//	bool was = false;
-//	while(ps.p[0] == '|' && ps.p[1] == '|') {
-//		next(ps.p + 2);
-//		t = testcondition(0, t);
-//		evalue e2(&e1);
-//		logical_and(e2);
-//		was = true;
-//	}
-//	//if(was)
-//	//	gen::pushl(FJmp, t);
-//}
-//
-//static void assigment(evalue& e1) {
-//	expression(e1);
-//	if((ps.p[0] == '=' && ps.p[1] != '=')
-//		|| ((ps.p[0] == '+' || ps.p[0] == '-' || ps.p[0] == '/' || ps.p[0] == '*') && ps.p[1] == '=')) {
-//		char t2 = *ps.p++;
-//		char t1 = '=';
-//		if(t2 == '=')
-//			t2 = 0;
-//		next(ps.p + 1);
-//		evalue e2(&e1);
-//		assigment(e2);
-//		binary_operation(e2, t1, t2);
-//	}
-//}
-//
-//static void assigment() {
-//	evalue e1;
-//	assigment(e1);
-//}
-//
-//static void skip_statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0) {
-//	genstate push;
-//	gen.code = false;
-//	statement(ct, br, cs, ds, cse);
-//}
-//
-//static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0) {
-//	if(match(';')) {
-//		// Empthy statement
-//	} else if(match('{')) {
-//		state_state push;
-//		while(*ps.p) {
-//			if(*ps.p == '}') {
-//				next(ps.p + 1);
-//				break;
-//			}
-//			auto psp = ps.p;
-//			statement(ct, br, cs, ds);
-//			if(psp == ps.p) {
-//				status(ErrorExpected1p, "keyword");
-//				break;
-//			}
-//		}
-//	} else if(match("break")) {
-//		if(!br)
-//			status(ErrorKeyword1pUsedWithout2p, "break", "loop");
-//		skip(';');
-//		if(br)
-//			*br = jumpforward(*br);
-//	} else if(match("continue")) {
-//		if(!ct)
-//			status(ErrorKeyword1pUsedWithout2p, "continue", "loop");
-//		skip(';');
-//		if(ct)
-//			jumpback(*ct);
-//	} else if(match("return")) {
-//		if(*ps.p == ';') {
-//			if(ps.member->result != type::v0)
-//				status(ErrorFunctionMustReturnValue);
-//		} else {
-//			evalue e1;
-//			expression(e1);
-//			e1.cast(ps.member->result);
-//			skip(';');
-//		}
-//		retproc(ps.member);
-//	} else if(match("if")) {
-//		int e = 0;
-//		while(true) {
-//			evalue e1;
-//			skip('(');
-//			expression(e1);
-//			skip(')');
-//			int b = testcondition(1);
-//			statement(ct, br, cs, ds);
-//			if(!match("else")) {
-//				label(b);
-//				break;
-//			}
-//			e = jumpforward(e);
-//			label(b);
-//			if(match("if"))
-//				continue;
-//			// Else statement - if anything not match
-//			statement(ct, br, cs, ds);
-//			break;
-//		}
-//		label(e);
-//	} else if(match("while")) {
-//		int label_continue = label();
-//		skip('(');
-//		expression();
-//		skip(')');
-//		int lable_break = testcondition(1);
-//		statement(&label_continue, &lable_break, 0, 0);
-//		jumpback(label_continue);
-//		label(lable_break);
-//	} else if(match("do")) {
-//		int label_continue = label();
-//		int label_break = 0;
-//		statement(&label_continue, &label_break, 0, 0);
-//		if(!match("while"))
-//			status(ErrorExpected1p, "while");
-//		skip('(');
-//		expression();
-//		skip(')');
-//		testcondition(0, label_continue);
-//		label(label_break);
-//	} else if(match("for")) {
-//		skip('(');
-//		// Инициализация цикла
-//		if(!declaration(ps.member, 0, false)) {
-//			evalue e1;
-//			assigment(e1);
-//		}
-//		if(*ps.p == ';')
-//			skip(';');
-//		// Генерируем метку продолжения и проверку условия цикла
-//		int label_continue = label();
-//		int label_break = 0;
-//		expression();
-//		label_break = testcondition(1, label_break);
-//		skip(';');
-//		// Пропустим блок инкремента
-//		const char* p_step = ps.p;
-//		expression_nocode();
-//		skip(')');
-//		// Генерируем блок тела цикла
-//		statement(&label_continue, &label_break, 0, 0);
-//		// Генерируем блок инкремента и переход на проверку условия
-//		const char* p_next = ps.p;
-//		next(p_step);
-//		expression();
-//		next(p_next);
-//		jumpback(label_continue);
-//		// Генерируем метку выхода из цикла
-//		label(label_break);
-//	} else if(match("switch")) {
-//		evalue e1;
-//		skip('(');
-//		expression(e1);
-//		skip(')');
-//		int break_label = 0;
-//		int case_label = 0;
-//		int default_label = 0;
-//		e1.load(Eax);
-//		statement(ct, &break_label, &case_label, &default_label, &e1);
-//		label(case_label);
-//		if(default_label)
-//			jumpback(default_label);
-//		label(break_label);
-//	} else if(match("case")) {
-//		//gen::dup();
-//		int v1 = expression_const();
-//		int v2 = v1;
-//		skip(':');
-//		if(cs)
-//			label(*cs);
-//		else
-//			status(ErrorKeyword1pUsedWithout2p, "case", "switch");
-//		int csm = 0;
-//		if(v1 == v2) {
-//			evalue e1(cse); e1.set(v1);
-//			binary_operation(e1, '=', '=');
-//			csm = testcondition(0, csm);
-//		}
-//		if(cs)
-//			*cs = csm;
-//	} else if(match("default")) {
-//		skip(':');
-//		if(ds)
-//			*ds = label();
-//		else
-//			status(ErrorKeyword1pUsedWithout2p, "default", "switch");
-//	} else if(!declaration(ps.member, 0, false, true, true)) {
-//		assigment();
-//		skip(';');
-//	}
-//}
+static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse) {
+	if(match(';')) {
+		// Empthy statement
+	} else if(match('{')) {
+		scope_state push;
+		while(*ps.p) {
+			if(*ps.p == '}') {
+				next(ps.p + 1);
+				break;
+			}
+			auto psp = ps.p;
+			statement(ct, br, cs, ds);
+			if(psp == ps.p) {
+				status(ErrorExpected1p, "keyword");
+				break;
+			}
+		}
+	} else if(match("break")) {
+		if(!br)
+			status(ErrorKeyword1pUsedWithout2p, "break", "loop");
+		skip(';');
+		if(br)
+			*br = jumpforward(*br);
+	} else if(match("continue")) {
+		if(!ct)
+			status(ErrorKeyword1pUsedWithout2p, "continue", "loop");
+		skip(';');
+		if(ct)
+			jumpback(*ct);
+	} else if(match("return")) {
+		if(*ps.p == ';') {
+			if(scope.member->result != v0)
+				status(ErrorFunctionMustReturnValue);
+		} else {
+			evalue e1;
+			expression(e1);
+			e1.cast(scope.member->result);
+			skip(';');
+		}
+		retproc(scope.member);
+	} else if(match("if")) {
+		int e = 0;
+		while(true) {
+			evalue e1;
+			skip('(');
+			expression(e1);
+			skip(')');
+			int b = testcondition(1);
+			statement(ct, br, cs, ds);
+			if(!match("else")) {
+				label(b);
+				break;
+			}
+			e = jumpforward(e);
+			label(b);
+			if(match("if"))
+				continue;
+			// Else statement - if anything not match
+			statement(ct, br, cs, ds);
+			break;
+		}
+		label(e);
+	} else if(match("while")) {
+		int label_continue = label();
+		skip('(');
+		expression();
+		skip(')');
+		int lable_break = testcondition(1);
+		statement(&label_continue, &lable_break, 0, 0);
+		jumpback(label_continue);
+		label(lable_break);
+	} else if(match("do")) {
+		int label_continue = label();
+		int label_break = 0;
+		statement(&label_continue, &label_break, 0, 0);
+		if(!match("while"))
+			status(ErrorExpected1p, "while");
+		skip('(');
+		expression();
+		skip(')');
+		testcondition(0, label_continue);
+		label(label_break);
+	} else if(match("for")) {
+		skip('(');
+		// Инициализация цикла
+		if(!declaration(0, false, true, true, true, true)) {
+			evalue e1;
+			assigment(e1);
+		}
+		if(*ps.p == ';')
+			skip(';');
+		// Генерируем метку продолжения и проверку условия цикла
+		int label_continue = label();
+		int label_break = 0;
+		expression();
+		label_break = testcondition(1, label_break);
+		skip(';');
+		// Пропустим блок инкремента
+		const char* p_step = ps.p;
+		expression_nocode();
+		skip(')');
+		// Генерируем блок тела цикла
+		statement(&label_continue, &label_break, 0, 0);
+		// Генерируем блок инкремента и переход на проверку условия
+		const char* p_next = ps.p;
+		next(p_step);
+		expression();
+		next(p_next);
+		jumpback(label_continue);
+		// Генерируем метку выхода из цикла
+		label(label_break);
+	} else if(match("switch")) {
+		evalue e1;
+		skip('(');
+		expression(e1);
+		skip(')');
+		int break_label = 0;
+		int case_label = 0;
+		int default_label = 0;
+		e1.load(Eax);
+		statement(ct, &break_label, &case_label, &default_label, &e1);
+		label(case_label);
+		if(default_label)
+			jumpback(default_label);
+		label(break_label);
+	} else if(match("case")) {
+		//gen::dup();
+		int v1 = expression_const();
+		int v2 = v1;
+		skip(':');
+		if(cs)
+			label(*cs);
+		else
+			status(ErrorKeyword1pUsedWithout2p, "case", "switch");
+		int csm = 0;
+		if(v1 == v2) {
+			evalue e1(cse); e1.set(v1);
+			binary_operation(e1, '=', '=');
+			csm = testcondition(0, csm);
+		}
+		if(cs)
+			*cs = csm;
+	} else if(match("default")) {
+		skip(':');
+		if(ds)
+			*ds = label();
+		else
+			status(ErrorKeyword1pUsedWithout2p, "default", "switch");
+	} else if(!declaration(0, false, true, true, true, true)) {
+		assigment();
+		skip(';');
+	}
+}
+
+static void skip_statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0) {
+	genstate push;
+	gen.code = false;
+	statement(ct, br, cs, ds, cse);
+}
 
 static void block_declaration() {
-	while(declaration(0, false, true));
+	while(declaration(0, false, true, false, false, false));
 }
 
 static void block_function() {
-	while(declaration(0, true, false));
+	while(declaration(0, true, false, false, false, false));
 }
 
 static void block_enums() {
@@ -1254,8 +1257,6 @@ static void block_enums() {
 		skip(';');
 	}
 }
-
-static void parse_module(symbol* member);
 
 static void block_imports() {
 	// Для того чтобы не есть память стэка

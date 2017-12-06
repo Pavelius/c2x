@@ -22,7 +22,7 @@ void symbol::clear() {
 }
 
 bool symbol::istype() const {
-	return this && type == SymbolType;
+	return this && (parent == types || parent == types_platform || parent == types_ref);
 }
 
 bool symbol::ismember() const {
@@ -39,10 +39,6 @@ bool symbol::isstatic() const {
 
 bool symbol::isfunction() const {
 	return this && type == SymbolFunction;
-}
-
-bool symbol::ismethodparam() const {
-	return this && type == SymbolParameter;
 }
 
 bool symbol::islocal() const {
@@ -87,6 +83,17 @@ symbol* c2::findsymbol(const char* id, symbol_s type) {
 	return 0;
 }
 
+symbol* c2::findsymbol(const char* id) {
+	for(auto psc = &scope; psc; psc = psc->parent) {
+		for(auto& e : symbols) {
+			if(e.id == id && e.visibility == scope.visibility) {
+				return &e;
+			}
+		}
+	}
+	return 0;
+}
+
 symbol* c2::findtype(const char* id, unsigned modifier_unsigned) {
 	// Найдем стандартный тип
 	for(auto e : standart_types) {
@@ -114,10 +121,21 @@ symbol* c2::findtype(const char* id, unsigned modifier_unsigned) {
 	return findsymbol(id, SymbolTypedef);
 }
 
-symbol* symbol::getchild() {
+symbol* symbol::getchild() const {
 	for(auto& e : symbols) {
 		if(e.parent == this)
 			return &e;
+	}
+	return 0;
+}
+
+symbol* symbol::getprevious() const {
+	symbol* result = 0;
+	for(auto& e : symbols) {
+		if(&e == this)
+			return result;
+		if(e.visibility == visibility)
+			result = &e;
 	}
 	return 0;
 }
@@ -173,7 +191,6 @@ symbol* symbol::reference() {
 	p->id = szdup("*");
 	p->parent = types_ref;
 	p->size = pointer_size;
-	p->count = 1;
 	return p;
 }
 

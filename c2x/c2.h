@@ -1,10 +1,14 @@
 #include "adat.h"
 #include "aref.h"
 #include "crt.h"
-#include "evalue.h"
 #include "files.h"
 
 #pragma once
+
+#define section_code ".code"
+#define section_data ".data"
+#define section_bbs ".bbs"
+#define section_strings ".strings"
 
 namespace c2 {
 	enum message_s {
@@ -41,40 +45,49 @@ namespace c2 {
 		Eax, Ebx, Ecx, Edx, Esi, Edi, Esp, Ebp,
 		Const,
 	};
-	enum sectiontypes : char {
-		Code, Data, DataStrings, DataUninitialized,
-	};
 	enum symbol_s : char {
 		SymbolType, SymbolTypedef, SymbolConstant,
 		SymbolMember, SymbolFunction,
-		SymbolLocal, SymbolParameter,
 	};
 	struct state_state {
 		bool			error_double_identifier;
 	};
+	struct section {
+		const char*		id;
+		unsigned		rvabase;
+		section*		next;
+		virtual void	add(unsigned char a) = 0;
+		virtual void	clear() = 0;
+		static section*	find(const char* id);
+		virtual unsigned get() = 0;
+		virtual unsigned char* getdata() = 0;
+		virtual void	set(unsigned count) = 0;
+	};
 	struct symbol {
 		const char*		id;
 		symbol*			result;
-		const char*		visibility;
+		const char*		visibility; // For module or module member this value equal start of text file. Local variables and parameters have it own visibility.
 		unsigned		size;
-		unsigned		count;
-		symbol*			parent;
+		unsigned		count; // Count of array elements. For non array this member is zero.
+		symbol*			parent; // For local variables this can be 0. For fuction parameter this can be fuctions member.
 		int				value;
 		short unsigned	flags;
 		symbol_s		type;
+		struct section*	section; // Local variable and types has no section.
 		//
 		operator bool() const { return id != 0; }
 		void			clear();
 		symbol*			dereference();
-		symbol*			getchild();
+		symbol*			getchild() const;
 		symbol*			getnext(symbol* parent);
-		unsigned		getsize() const { return size*count;}
+		const char*		getname() const { return (this ? id : "none"); }
+		symbol*			getprevious() const;
+		unsigned		getsize() const { return size;}
 		static void		initialize();
-		bool			isforward() const;
+		bool			isarray() const { return count != 0; }
 		bool			isfunction() const;
 		bool			islocal() const;
 		bool			ismember() const;
-		bool			ismethodparam() const;
 		bool			isnumber() const;
 		bool			ispointer() const;
 		bool			isstatic() const;
@@ -84,11 +97,12 @@ namespace c2 {
 		void			setfunctionfw() { type = SymbolFunction; }
 	};
 	struct scope_state {
-		scope_state*	parent;
 		symbol*			member;
 		const char*		visibility;
+		scope_state*	parent;
 		scope_state();
 		~scope_state();
+		symbol*			getmodule() const;
 	};
 	struct evalue {
 		struct plugin {
@@ -139,21 +153,13 @@ namespace c2 {
 		genstate();
 		~genstate();
 	};
-	struct segment {
-		unsigned		rvabase;
-		segment() : rvabase(0) {}
-		virtual void	add(unsigned char a) = 0;
-		virtual unsigned	get() = 0;
-		virtual unsigned char*	getdata() = 0;
-		virtual void	set(unsigned count) = 0;
-	};
 	symbol*				addsymbol(const char* id, symbol* result, symbol* parent, symbol_s type);
-	extern segment*		segments[DataUninitialized + 1];
 	extern evalue::plugin*	backend;
 	void				compile(const char* url);
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
+	symbol*				findsymbol(const char* id);
 	symbol*				findsymbol(const char* id, symbol_s type);
 	symbol*				findsymbol(const char* id, const char* visibility, symbol_s type);
 	symbol*				findtype(const char* id, unsigned modifier_unsigned);

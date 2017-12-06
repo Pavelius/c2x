@@ -160,5 +160,5 @@ void evalue::cast(symbol* need_type)
 		result = need_type;
 	}
 	if(result != need_type)
-		status(ErrorCastType1pTo2p, result->id, need_type->id);
+		status(ErrorCastType1pTo2p, result ? result->id : "none", need_type ? need_type->id : "none");
 }

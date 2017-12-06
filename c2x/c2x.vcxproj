@@ -75,6 +75,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -117,7 +118,6 @@
     <ClInclude Include="c2.h" />
     <ClInclude Include="collection.h" />
     <ClInclude Include="crt.h" />
-    <ClInclude Include="evalue.h" />
     <ClInclude Include="files.h" />
     <ClInclude Include="io.h" />
     <ClInclude Include="stringcreator.h" />
@@ -136,7 +136,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="messages.cpp" />
     <ClCompile Include="scope_state.cpp" />
-    <ClCompile Include="segment.cpp" />
+    <ClCompile Include="section.cpp" />
     <ClCompile Include="status_state.cpp" />
     <ClCompile Include="stringcreator.cpp" />
     <ClCompile Include="symbol.cpp" />
