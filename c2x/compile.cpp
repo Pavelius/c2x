@@ -1,32 +1,49 @@
 #include "c2.h"
 
 using namespace c2;
-int	c2::errors;
 
-static void logical_or(evalue& e1);
-static void parse_module(symbol* member);
-static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
+static void		logical_or(evalue& e1);
+static void		parse_module(symbol* member);
+static symbol*	standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
+static void		statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
+int				c2::errors;
+scope_state		c2::scope;
 
 static struct parser_state {
 	const char*		p;
+	symbol*			current_module;
+	symbol*			current_member;
+	parser_state() {
+		memset(this, 0, sizeof(*this));
+	}
 } ps;
+
+static symbol* getmodule() {
+	return ps.current_module;
+}
+
+static symbol* getmember() {
+	return ps.current_member;
+}
 
 scope_state::scope_state() : scope_state(scope) {
 	if(this != &scope)
 		scope.parent = this;
-	scope.member = getmodule();
 	scope.visibility = ps.p;
 }
 
+scope_state::~scope_state() {
+	scope = *this;
+}
+
 void c2::error(message_s id, ...) {
-	if(scope.member)
-		errorv(id, scope.member, scope.member->parent, xva_start(id));
+	if(getmodule())
+		errorv(id, 0, getmodule(), xva_start(id));
 	else
 		errorv(id, 0, 0, xva_start(id));
 }
 
 void c2::status(message_s id, ...) {
-
 }
 
 static void declare_status(message_s m, const symbol* member, ...) {
@@ -69,8 +86,9 @@ static void addr32(int v, symbol* sym, section* sec) {
 static void calling(symbol* sym, evalue* parameters, int count) {
 }
 
-static void prologue(symbol* sym) {
-	if(!scope.member || !sym)
+static void prologue() {
+	auto sym = getmember();
+	if(!sym)
 		return;
 	//if(gen.code) {
 	//	sym->value = segments[Code]->get();
@@ -78,14 +96,18 @@ static void prologue(symbol* sym) {
 	//}
 }
 
-static void epilogue(symbol* sym) {
+static void epilogue() {
+	auto sym = getmember();
+	if(!sym)
+		return;
 	//if(!ps.module || !sym)
 	//	return;
 	//if(gen.code)
 	//	backend->epilogue(ps.module, sym);
 }
 
-static void retproc(symbol* sym) {
+static void retproc() {
+	auto sym = getmember();
 	if(!sym)
 		return;
 	//if(gen.code)
@@ -173,6 +195,24 @@ static void binary_operation(evalue& e2, char t1, char t2 = 0) {
 		e1.load();
 	//if(gen.code)
 	//	backend->operation(e1, e2, t1, t2);
+}
+
+static symbol* addsymbol(const char* id, symbol* result) {
+	auto p = findsymbol(id, scope.visibility);
+	if(p) {
+		if(state.error_double_identifier)
+			error(Error1p2pAlreadyDefined, "symbol", id);
+		return p;
+	}
+	p = symbol::add();
+	if(!p)
+		return 0;
+	p->clear();
+	p->id = id;
+	p->result = result;
+	p->visibility = scope.visibility;
+	p->declared = ps.p;
+	return p;
 }
 
 static bool skipcm() {
@@ -318,6 +358,7 @@ static bool istype(symbol** declared, unsigned& flags) {
 	int m_public = 0;
 	int m_static = 0;
 	int m_unsigned = 0;
+	const char* p1 = ps.p;
 	while(*ps.p) {
 		if(match("static")) {
 			result = true;
@@ -332,11 +373,24 @@ static bool istype(symbol** declared, unsigned& flags) {
 			m_unsigned++;
 			continue;
 		} else if(ischab(*ps.p)) {
-			const char* p1 = ps.p;
 			auto id = szdup(identifier());
 			// Теперь надо найти тип, и убедиться, что это действительно определение
 			bool change_back = true;
-			e = findtype(id, m_unsigned);
+			auto parent_module = getmodule();
+			if(isthis(id))
+				e = getmodule();
+			else
+				e = findtype(id, flags);
+			if(!e && parent_module) {
+				e = findtype(id, parent_module->visibility);
+				if(!e) {
+					auto this_name = szext(parent_module->id);
+					if(!this_name)
+						this_name = parent_module->id;
+					if(strcmp(id, this_name) == 0)
+						e = parent_module;
+				}
+			}
 			if(e) {
 				if(*ps.p == '*' || ischa(*ps.p)) {
 					change_back = false;
@@ -354,9 +408,9 @@ static bool istype(symbol** declared, unsigned& flags) {
 			if(m_unsigned > 1)
 				status(Error1pDontUse2pTimes, "unsigned", m_unsigned);
 			if(m_static)
-				set(flags, Static);
+				flags = setstatic(flags);
 			if(m_public)
-				set(flags, Public);
+				flags = setpublic(flags);
 			*declared = e;
 		}
 		break;
@@ -421,7 +475,7 @@ static void initialize(symbol* sym, section* sec) {
 					if(*ps.p == '}')
 						break;
 				}
-				t = t->getnext(sym);
+				t = t->getnext();
 			}
 		} else {
 			// simple type
@@ -645,11 +699,14 @@ static void postfix(evalue& e1) {
 			e1.getrvalue();
 			symbol* sym = 0;
 			if(*ps.p == '(') {
-				sym = findsymbol(n, e1.result->visibility, SymbolFunction);
-				if(!sym)
-					sym = addsymbol(n, i32, e1.result, SymbolFunction);
+				sym = findsymbol(n, e1.result->visibility, true);
+				if(!sym) {
+					sym = addsymbol(n, i32);
+					// Forward declaration function in scope of expression result
+					sym->visibility = e1.result->visibility;
+				}
 			} else
-				sym = findsymbol(n, e1.result->visibility, SymbolMember);
+				sym = findsymbol(n, e1.result->visibility, false);
 			evalue e2(&e1); e2.set(sym);
 			binary_operation(e2, '.');
 		} else if(*ps.p == '[') {
@@ -767,7 +824,7 @@ static void unary(evalue& e1) {
 			e1.set(sym->size);
 			skip(')');
 		} else if(match("this"))
-			e1.set(scope.getmodule());
+			e1.set(getmodule());
 		else if(match("true"))
 			e1.set(1);
 		else if(match("false"))
@@ -952,7 +1009,7 @@ static void instance(symbol* variable, bool runtime_assigment, bool allow_assigm
 		// Get last element in this visible scope and add his size to calculate base of this element.
 		// In case when there is no previous member initialize to zero.
 		auto p = variable->getprevious();
-		if(p && p != scope.getmodule())
+		if(p && p != getmodule())
 			variable->value = align_symbol_offset(p->value, p->getsize(), locale_variable, align_size);
 		else
 			variable->value = 0;
@@ -972,10 +1029,11 @@ static void instance(symbol* variable, bool runtime_assigment, bool allow_assigm
 	}
 	// Calculate size of single module element. Get size from type of expression.
 	variable->size = variable->result->size;
-	if(variable->parent->istype()) {
+	auto m = getmodule();
+	if(variable->ismember() && !variable->isstatic() && !variable->isfunction()) {
 		// Module member change size of his parent.
-		if(!variable->isstatic() && variable->ismember())
-			variable->parent->size = variable->value + variable->size;
+		auto m = getmodule();
+		m->size += variable->size;
 	}
 }
 
@@ -996,17 +1054,14 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 			ps.p = p1;
 			return false;
 		}
-		bool islocal = scope.member->isfunction() && !is(flags, Static);
 		if(gen.unique) {
 			// Если нашли совпадение выдаем ошибку
 		}
-		auto m2 = addsymbol(id, result, scope.member, SymbolMember);
+		auto m2 = addsymbol(id, result);
 		//declare_status(StatusDeclare, m2);
 		if(*ps.p == '(') {
 			scope_state push;
-			scope.member = m2;
 			next(ps.p + 1);
-			m2->type = SymbolMember;
 			m2->count = 0;
 			while(*ps.p) {
 				symbol* result;
@@ -1014,7 +1069,7 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 				if(istype(&result, pflags)) {
 					result = parse_pointer(result);
 					auto id = szdup(identifier());
-					result = addsymbol(id, result, scope.member, SymbolMember);
+					result = addsymbol(id, result);
 					instance(result, false, false, false, 4);
 					m2->count++;
 				}
@@ -1029,10 +1084,13 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 				next(ps.p + 1);
 			} else {
 				scope_state push;
-				prologue(m2);
+				auto ps_current_member = ps.current_member;
+				ps.current_member = m2;
+				prologue();
 				statement(0, 0, 0, 0);
-				retproc(m2);
-				epilogue(m2);
+				retproc();
+				epilogue();
+				ps.current_member = ps_current_member;
 			}
 			return true;
 		} else if(*ps.p == '[') {
@@ -1088,15 +1146,16 @@ static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse) {
 			jumpback(*ct);
 	} else if(match("return")) {
 		if(*ps.p == ';') {
-			if(scope.member->result != v0)
+			if(getmember() && getmember()->result != v0)
 				status(ErrorFunctionMustReturnValue);
 		} else {
 			evalue e1;
 			expression(e1);
-			e1.cast(scope.member->result);
+			if(getmember())
+				e1.cast(getmember()->result);
 			skip(';');
 		}
-		retproc(scope.member);
+		retproc();
 	} else if(match("if")) {
 		int e = 0;
 		while(true) {
@@ -1234,7 +1293,7 @@ static void block_enums() {
 		symbol* t = 0;
 		while(*ps.p) {
 			if(ischab(*ps.p)) {
-				t = addsymbol(identifier(), result, scope.member, SymbolConstant);
+				t = addsymbol(identifier(), result);
 				t->value = num++;
 			} else if(*ps.p == '=') {
 				next(ps.p + 1);
@@ -1279,13 +1338,13 @@ static void block_imports() {
 			auto id = szdup(pz);
 			auto m = findmodule(url);
 			if(!m) {
-				m = addsymbol(url, 0, types, SymbolType);
+				m = addsymbol(url, 0);
 				m->visibility = 0;
 				parse_module(m);
 			}
 			if(isloaded(m))
 				error(Error1p2pAlreadyDefined, "import module", m->id);
-			addsymbol(id, m, scope.member, SymbolTypedef);
+			addsymbol(id, m);
 			skip(';');
 			break;
 		}
@@ -1299,8 +1358,9 @@ static void block_start(symbol* sym) {
 		status(ErrorCantFind1pWithName2p, "import module", sym->id);
 		return;
 	}
+	sym->declared = sym->visibility;
+	ps.current_module = sym;
 	scope.parent = 0;
-	scope.member = sym;
 	scope.visibility = sym->visibility;
 	ps.p = scope.visibility;
 	next(ps.p);
@@ -1326,8 +1386,8 @@ static void parse_module(symbol* member) {
 }
 
 void c2::compile(const char* id) {
-	auto p = findsymbol(id, 0, SymbolType);
+	auto p = findsymbol(id, 0);
 	if(p)
 		return;
-	parse_module(addsymbol(id, 0, types, SymbolType));
+	parse_module(addsymbol(id, 0));
 }

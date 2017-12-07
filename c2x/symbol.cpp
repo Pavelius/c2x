@@ -3,7 +3,16 @@
 
 using namespace c2;
 
-adat<symbol, 8096> symbols;
+typedef adat<symbol, 8096> symbolset;
+
+enum flag_s : char {
+	Public, Static, Readed, Writed, Pseudoname
+};
+
+static symbolset symbols;
+static symbolset pointers;
+static symbol* standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
+static unsigned	pointer_size = 4;
 symbol c2::i8[1]; // Байт со знаком
 symbol c2::i16[1]; // Слово со знаком
 symbol c2::i32[1]; // Двойное слово со знаком
@@ -12,37 +21,46 @@ symbol c2::u16[1]; // Слово без знака
 symbol c2::u32[1]; // Двойное слово без знака
 symbol c2::v0[1]; // Путое значение
 symbol c2::types[1];
-static symbol* standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
-static symbol types_ref[1];
-static symbol types_platform[1];
-static unsigned pointer_size = 4;
 
 void symbol::clear() {
 	memset(this, 0, sizeof(*this));
 }
 
 bool symbol::istype() const {
-	return this && (parent == types || parent == types_platform || parent == types_ref);
+	return this && !result;
+}
+
+bool symbol::istypesimple() const {
+	return this && !result && visibility==0;
 }
 
 bool symbol::ismember() const {
-	return this && !(parent == types || parent == types_platform || parent == types_ref);
+	return this && result && !ispointer();
 }
 
 bool symbol::ispointer() const {
-	return this && (parent == types_ref);
-}
-
-bool symbol::isstatic() const {
-	return is(flags, Static);
+	return this && (id[0] == '*' && id[1] == 0);
 }
 
 bool symbol::isfunction() const {
-	return this && type == SymbolFunction;
+	// Function and function parameters must have same 'declared' and 'visiblity'
+	return this && declared && declared[0] == '(';
+}
+
+bool symbol::isfunctionparam() const {
+	return this && visibility && visibility[0] == '(';
+}
+
+bool symbol::isfunctionparam(symbol* function) const {
+	return visibility == function->declared;
+}
+
+bool symbol::isstatic() const {
+	return (flags & (1 << Static)) != 0;
 }
 
 bool symbol::islocal() const {
-	return this && !parent;
+	return this && visibility && visibility[0] == '{';
 }
 
 bool symbol::isnumber() const {
@@ -52,6 +70,97 @@ bool symbol::isnumber() const {
 		|| this == u16
 		|| this == i32
 		|| this == u32;
+}
+
+bool symbol::ispseudoname() const {
+	return this && result && (flags & (1 << Pseudoname)) != 0;
+}
+
+symbol* symbol::add() {
+	for(auto& e : symbols) {
+		if(!e)
+			return &e;
+	}
+	return symbols.add();
+}
+
+static symbol* addp() {
+	for(auto& e : pointers) {
+		if(!e)
+			return &e;
+	}
+	return pointers.add();
+}
+
+symbol* symbol::reference() {
+	if(!this)
+		return 0;
+	for(auto& e : pointers) {
+		if(e.result == this && e.ispointer())
+			return &e;
+	}
+	auto p = addp();
+	p->clear();
+	p->result = this;
+	p->id = szdup("*");
+	p->size = pointer_size;
+	return p;
+}
+
+symbol* symbol::dereference() {
+	if(!ispointer())
+		return 0;
+	return result;
+}
+
+symbol*	symbol::getchild() const {
+	auto pe = symbols.end();
+	auto pp = declared;
+	for(auto p = this + 1; p < pe; p++) {
+		if(p->visibility == pp)
+			return (symbol*)p;
+	}
+	return 0;
+}
+
+symbol*	symbol::getnext() const {
+	auto pe = symbols.end();
+	auto pp = visibility;
+	for(auto p = this + 1; p < pe; p++) {
+		if(p->visibility == pp)
+			return (symbol*)p;
+	}
+	return 0;
+}
+
+symbol*	symbol::getprevious() const {
+	auto pe = symbols.begin();
+	auto pp = visibility;
+	for(auto p = this - 1; p >= pe; p--) {
+		if(p->visibility == pp)
+			return (symbol*)p;
+	}
+	return 0;
+}
+
+bool c2::isthis(const char* id) {
+	return id[0] == 't'
+		&& id[1] == 'h'
+		&& id[2] == 'i'
+		&& id[3] == 's'
+		&& id[4] == 0;
+}
+
+bool c2::isstatic(unsigned flags) {
+	return (flags & (1 << Static)) != 0;
+}
+
+unsigned c2::setstatic(unsigned flags) {
+	return flags | (1 << Static);
+}
+
+unsigned c2::setpublic(unsigned flags) {
+	return flags |= (1 << Public);
 }
 
 symbol* c2::findmodule(const char* name) {
@@ -66,30 +175,27 @@ bool c2::isloaded(symbol* result) {
 	return false;
 }
 
-symbol* c2::findsymbol(const char* name, const char* visibility, symbol_s type) {
+symbol* c2::findsymbol(const char* name, const char* visibility) {
 	for(auto& e : symbols) {
-		if(e.id == name && e.visibility == visibility && e.type==type)
+		if(e.id == name && e.visibility == visibility)
 			return &e;
 	}
 	return 0;
 }
 
-symbol* c2::findsymbol(const char* id, symbol_s type) {
-	for(auto psc = &scope; psc; psc = psc->parent) {
-		auto sym = findsymbol(id, psc->visibility, type);
-		if(sym)
-			return sym;
+symbol* c2::findsymbol(const char* name, const char* visibility, bool is_function) {
+	for(auto& e : symbols) {
+		if(e.id == name && e.visibility == visibility && e.isfunction()==is_function)
+			return &e;
 	}
 	return 0;
 }
 
 symbol* c2::findsymbol(const char* id) {
 	for(auto psc = &scope; psc; psc = psc->parent) {
-		for(auto& e : symbols) {
-			if(e.id == id && e.visibility == scope.visibility) {
-				return &e;
-			}
-		}
+		auto sym = findsymbol(id, psc->visibility);
+		if(sym)
+			return sym;
 	}
 	return 0;
 }
@@ -118,92 +224,20 @@ symbol* c2::findtype(const char* id, unsigned modifier_unsigned) {
 			return u32;
 		return i32;
 	}
-	return findsymbol(id, SymbolTypedef);
-}
-
-symbol* symbol::getchild() const {
-	for(auto& e : symbols) {
-		if(e.parent == this)
-			return &e;
-	}
 	return 0;
 }
 
-symbol* symbol::getprevious() const {
-	symbol* result = 0;
+symbol* c2::findtype(const char* id, const char* visibility) {
 	for(auto& e : symbols) {
-		if(&e == this)
-			return result;
-		if(e.visibility == visibility)
-			result = &e;
-	}
-	return 0;
-}
-
-symbol* symbol::getnext(symbol* parent) {
-	auto pe = symbols.end();
-	for(auto p = this + 1; p < pe; p++) {
-		if(p->parent == parent)
-			return p;
-	}
-	return 0;
-}
-
-static symbol* addsymboln() {
-	for(auto& e : symbols) {
-		if(!e)
+		if(e.visibility == visibility && e.id == id && e.ispseudoname() && !e.result->istypesimple())
 			return &e;
 	}
-	return symbols.add();
-}
-
-symbol* c2::addsymbol(const char* id, symbol* result, symbol* parent, symbol_s type) {
-	auto p = findsymbol(id, scope.visibility, type);
-	if(p) {
-		if(state.error_double_identifier)
-			error(Error1p2pAlreadyDefined, "symbol", id);
-		return p;
-	}
-	p = addsymboln();
-	if(!p)
-		return 0;
-	if(!parent)
-		parent = scope.member;
-	p->clear();
-	p->id = id;
-	p->type = type;
-	p->result = result;
-	p->parent = parent;
-	p->visibility = scope.visibility;
-	return p;
-}
-
-symbol* symbol::reference() {
-	if(!this)
-		return 0;
-	for(auto& e : symbols) {
-		if(e.result == this && e.parent == types_ref)
-			return &e;
-	}
-	auto p = addsymboln();
-	p->clear();
-	p->result = this;
-	p->id = szdup("*");
-	p->parent = types_ref;
-	p->size = pointer_size;
-	return p;
-}
-
-symbol* symbol::dereference() {
-	if(!ispointer())
-		return 0;
-	return result;
+	return 0;
 }
 
 void basetype(symbol* p, const char* name, unsigned size) {
 	p->id = szdup(name);
 	p->size = size;
-	p->parent = types;
 }
 
 void symbol::initialize() {

@@ -66,9 +66,6 @@
     <ClCompile Include="compile.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>
-    <ClCompile Include="scope_state.cpp">
-      <Filter>Компилятор</Filter>
-    </ClCompile>
     <ClCompile Include="symbol.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>

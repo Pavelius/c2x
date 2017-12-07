@@ -38,16 +38,9 @@ namespace c2 {
 		StatusDeclare,
 		FirstStatus = StatusStartParse, LastStatus = StatusDeclare,
 	};
-	enum flag_s : char {
-		Public, Static, Readed, Writed, NoInitialized
-	};
 	enum register_s : char {
 		Eax, Ebx, Ecx, Edx, Esi, Edi, Esp, Ebp,
 		Const,
-	};
-	enum symbol_s : char {
-		SymbolType, SymbolTypedef, SymbolConstant,
-		SymbolMember, SymbolFunction,
 	};
 	struct state_state {
 		bool			error_double_identifier;
@@ -63,46 +56,48 @@ namespace c2 {
 		virtual unsigned char* getdata() = 0;
 		virtual void	set(unsigned count) = 0;
 	};
+	struct scope_state {
+		scope_state*	parent;
+		const char*		visibility;
+		scope_state();
+		~scope_state();
+	};
 	struct symbol {
 		const char*		id;
 		symbol*			result;
 		const char*		visibility; // For module or module member this value equal start of text file. Local variables and parameters have it own visibility.
+		const char*		declared; // Line where symbol declared.
 		unsigned		size;
 		unsigned		count; // Count of array elements. For non array this member is zero.
-		symbol*			parent; // For local variables this can be 0. For fuction parameter this can be fuctions member.
 		int				value;
-		short unsigned	flags;
-		symbol_s		type;
+		unsigned		flags;
 		struct section*	section; // Local variable and types has no section.
 		//
 		operator bool() const { return id != 0; }
+		static symbol*	add();
 		void			clear();
 		symbol*			dereference();
 		symbol*			getchild() const;
-		symbol*			getnext(symbol* parent);
+		symbol*			getnext() const;
 		const char*		getname() const { return (this ? id : "none"); }
 		symbol*			getprevious() const;
 		unsigned		getsize() const { return size;}
 		static void		initialize();
 		bool			isarray() const { return count != 0; }
 		bool			isfunction() const;
+		bool			isfunctionparam() const;
+		bool			isfunctionparam(symbol* function) const;
 		bool			islocal() const;
 		bool			ismember() const;
 		bool			isnumber() const;
 		bool			ispointer() const;
+		bool			ispseudoname() const;
 		bool			isstatic() const;
 		bool			istype() const;
+		bool			istypesimple() const;
 		symbol*			reference();
-		void			setfunction() { type = SymbolFunction; }
-		void			setfunctionfw() { type = SymbolFunction; }
-	};
-	struct scope_state {
-		symbol*			member;
-		const char*		visibility;
-		scope_state*	parent;
-		scope_state();
-		~scope_state();
-		symbol*			getmodule() const;
+		void			setfunction();
+		void			setfunctionfw();
 	};
 	struct evalue {
 		struct plugin {
@@ -153,23 +148,24 @@ namespace c2 {
 		genstate();
 		~genstate();
 	};
-	symbol*				addsymbol(const char* id, symbol* result, symbol* parent, symbol_s type);
 	extern evalue::plugin*	backend;
 	void				compile(const char* url);
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
 	symbol*				findsymbol(const char* id);
-	symbol*				findsymbol(const char* id, symbol_s type);
-	symbol*				findsymbol(const char* id, const char* visibility, symbol_s type);
-	symbol*				findtype(const char* id, unsigned modifier_unsigned);
+	symbol*				findsymbol(const char* id, const char* visibility);
+	symbol*				findsymbol(const char* id, const char* visibility, bool function);
+	symbol*				findtype(const char* id, unsigned flags);
+	symbol*				findtype(const char* id, const char* visibility);
 	symbol*				findmodule(const char* url);
 	extern genstate		gen;
-	inline bool			is(unsigned flags, flag_s value) { return (flags & (1 << value)) != 0; }
 	bool				isloaded(symbol* result);
-	inline void			remove(unsigned& flags, flag_s value) { flags &= ~(1 << value); }
-	inline void			set(unsigned& flags, flag_s value) { flags |= (1 << value); }
+	bool				isstatic(unsigned flags);
+	bool				isthis(const char* id);
 	extern scope_state	scope;
+	unsigned			setpublic(unsigned flags);
+	unsigned			setstatic(unsigned flags);
 	extern state_state	state;
 	void				status(message_s id, ...);
 
