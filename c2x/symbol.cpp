@@ -11,6 +11,7 @@ enum flag_s : char {
 
 static symbolset symbols;
 static symbolset pointers;
+static symbolset modules;
 static symbol* standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
 static unsigned	pointer_size = 4;
 symbol c2::i8[1]; // Байт со знаком
@@ -81,18 +82,14 @@ void symbol::setpseudoname() {
 }
 
 symbol* symbol::add() {
-	for(auto& e : symbols) {
-		if(!e)
-			return &e;
-	}
 	return symbols.add();
 }
 
+symbol* symbol::addmodule() {
+	return modules.add();
+}
+
 static symbol* addp() {
-	for(auto& e : pointers) {
-		if(!e)
-			return &e;
-	}
 	return pointers.add();
 }
 
@@ -167,18 +164,6 @@ unsigned c2::setpublic(unsigned flags) {
 	return flags |= (1 << Public);
 }
 
-symbol* c2::findmodule(const char* name) {
-	for(auto& e : symbols) {
-		if(e.id == name && e.istype())
-			return &e;
-	}
-	return 0;
-}
-
-bool c2::isloaded(symbol* result) {
-	return false;
-}
-
 symbol* c2::findsymbol(const char* name, const char* visibility) {
 	for(auto& e : symbols) {
 		if(e.id == name && e.visibility == visibility)
@@ -190,6 +175,14 @@ symbol* c2::findsymbol(const char* name, const char* visibility) {
 symbol* c2::findsymbol(const char* name, const char* visibility, bool is_function) {
 	for(auto& e : symbols) {
 		if(e.id == name && e.visibility == visibility && e.isfunction()==is_function)
+			return &e;
+	}
+	return 0;
+}
+
+symbol* c2::findmodule(const char* id) {
+	for(auto& e : modules) {
+		if(e.id == id)
 			return &e;
 	}
 	return 0;

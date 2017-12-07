@@ -3,7 +3,7 @@
 using namespace c2;
 
 static void			logical_or(evalue& e1);
-static void			parse_module(symbol* member);
+static symbol*		parse_module(const char* id);
 static symbol*		standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
 static void			statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
 int					c2::errors;
@@ -1214,20 +1214,20 @@ static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse) {
 		label(label_break);
 	} else if(match("for")) {
 		skip('(');
-		// Инициализация цикла
+		// Initialize loop
 		if(!declaration(0, false, true, true, true, true)) {
 			evalue e1;
 			assigment(e1);
 		}
 		if(*ps.p == ';')
 			skip(';');
-		// Генерируем метку продолжения и проверку условия цикла
+		// Generate label continue and condition check
 		int label_continue = label();
 		int label_break = 0;
 		expression();
 		label_break = testcondition(1, label_break);
 		skip(';');
-		// Пропустим блок инкремента
+		// Skip increment block
 		const char* p_step = ps.p;
 		expression_nocode();
 		skip(')');
@@ -1311,7 +1311,7 @@ static void block_enums() {
 				t->value = num++;
 			} else if(*ps.p == '=') {
 				next(ps.p + 1);
-				//num = expression_const();
+				num = expression_const();
 				if(t)
 					t->value = num;
 				else
@@ -1332,8 +1332,8 @@ static void block_enums() {
 }
 
 static void block_imports() {
-	// Для того чтобы не есть память стэка
-	// сделаем данную переменную статической
+	// block_imports() has recursive calling.
+	// Create 'temp' variable with static attribute will reduce stack memory usage.
 	static char temp[260];
 	while(match("import")) {
 		temp[0] = 0;
@@ -1348,31 +1348,32 @@ static void block_imports() {
 			}
 			if(match("as"))
 				pz = identifier();
-			auto url = szdup(temp);
 			auto id = szdup(pz);
-			auto m = findmodule(url);
-			if(!m) {
-				m = addsymbol(url, 0);
-				m->visibility = 0;
-				parse_module(m);
+			auto m = parse_module(temp);
+			if(m) {
+				m = addsymbol(id, m);
+				m->setpseudoname();
 			}
-			if(isloaded(m))
-				error(Error1p2pAlreadyDefined, "import module", m->id);
-			m = addsymbol(id, m);
-			m->setpseudoname();
 			skip(';');
 			break;
 		}
 	}
 }
 
-static void parse_module(symbol* sym) {
-	scopestate push;
-	auto save_ps = ps;
+static symbol* parse_module(const char* id) {
+	id = szdup(id);
+	auto sym = findmodule(id);
+	if(sym)
+		return sym;
+	sym = symbol::addmodule();
+	sym->id = id;
+	sym->visibility = 0;
 	if(!sym->visibility)
 		sym->visibility = getfile(sym->id);
 	if(!sym->visibility)
 		status(ErrorCantFind1pWithName2p, "import module", sym->id);
+	scopestate push;
+	auto save_ps = ps;
 	ps.current_module = sym;
 	sym->declared = sym->visibility;
 	scope.parent = 0;
@@ -1392,11 +1393,9 @@ static void parse_module(symbol* sym) {
 	if(!errors && *ps.p)
 		status(ErrorUnexpectedSymbols);
 	ps = save_ps;
+	return sym;
 }
 
 void c2::compile(const char* id) {
-	auto p = findsymbol(id, 0);
-	if(p)
-		return;
-	parse_module(addsymbol(id, 0));
+	parse_module(id);
 }

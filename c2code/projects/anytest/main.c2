@@ -11,5 +11,6 @@ int main()
 	if(j==12) {
 		int j = 10;
 		i = j + 10;
+		int x = 10;
 	}
 }

@@ -66,6 +66,7 @@ namespace c2 {
 		//
 		operator bool() const { return id != 0; }
 		static symbol*	add();
+		static symbol*	addmodule();
 		void			clear();
 		symbol*			dereference();
 		symbol*			getchild() const;
@@ -143,13 +144,13 @@ namespace c2 {
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
+	symbol*				findmodule(const char* id);
 	symbol*				findsymbol(const char* id, const char* visibility);
 	symbol*				findsymbol(const char* id, const char* visibility, bool function);
 	symbol*				findtype(const char* id, unsigned flags);
 	symbol*				findtype(const char* id, const char* visibility);
 	symbol*				findmodule(const char* url);
 	extern genstate		gen;
-	bool				isloaded(symbol* result);
 	bool				isstatic(unsigned flags);
 	bool				isthis(const char* id);
 	unsigned			setpublic(unsigned flags);
