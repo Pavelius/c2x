@@ -36,7 +36,7 @@ bool symbol::islocal() const {
 }
 
 bool symbol::istypesimple() const {
-	return this && !result && visibility==0;
+	return this && !result && visibility == 0;
 }
 
 bool symbol::ismember() const {
@@ -174,7 +174,7 @@ symbol* c2::findsymbol(const char* name, const char* visibility) {
 
 symbol* c2::findsymbol(const char* name, const char* visibility, bool is_function) {
 	for(auto& e : symbols) {
-		if(e.id == name && e.visibility == visibility && e.isfunction()==is_function)
+		if(e.id == name && e.visibility == visibility && e.isfunction() == is_function)
 			return &e;
 	}
 	return 0;

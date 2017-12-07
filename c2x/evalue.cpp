@@ -17,29 +17,24 @@ using namespace c2;
 static symbol		lvalue_type[2];
 evalue::plugin*		c2::backend;
 
-evalue::evalue() : result(i32), sym(0), offset(0), reg(Const), next(0)
-{
+evalue::evalue() : result(i32), sym(0), offset(0), reg(Const), next(0) {
 }
 
-evalue::evalue(evalue* e) : evalue()
-{
+evalue::evalue(evalue* e) : evalue() {
 	next = e;
 }
 
-void evalue::set(int value)
-{
+void evalue::set(int value) {
 	this->result = i32;
 	this->offset = value;
 	this->sym = 0;
 	this->reg = Const;
 }
 
-void evalue::set(symbol* value)
-{
+void evalue::set(symbol* value) {
 	if(!value)
 		set(0);
-	else if(value->istype())
-	{
+	else if(value->istype()) {
 		this->result = value;
 		this->offset = 0;
 		this->sym = 0;
@@ -50,8 +45,7 @@ void evalue::set(symbol* value)
 	//	set(value->value);
 	//	this->result = value->result;
 	//}
-	else
-	{
+	else {
 		this->result = value->result;
 		this->offset = 0;
 		this->sym = value;
@@ -61,34 +55,27 @@ void evalue::set(symbol* value)
 	}
 }
 
-void evalue::set(const evalue& e)
-{
+void evalue::set(const evalue& e) {
 	sym = e.sym;
 	result = e.result;
 	offset = e.offset;
 	reg = e.reg;
 }
 
-void evalue::setlvalue()
-{
+void evalue::setlvalue() {
 	sym = lvalue_type;
 }
 
-void evalue::clear()
-{
+void evalue::clear() {
 	evalue();
 }
 
-register_s evalue::getfree() const
-{
+register_s evalue::getfree() const {
 	static register_s valid_registers[] = {Eax, Ebx, Ecx, Edx, Esi, Edi};
-	for(auto result : valid_registers)
-	{
+	for(auto result : valid_registers) {
 		bool all_correct = true;
-		for(auto p = this; p; p = p->next)
-		{
-			if(p->reg == result)
-			{
+		for(auto p = this; p; p = p->next) {
+			if(p->reg == result) {
 				all_correct = false;
 				break;
 			}
@@ -99,15 +86,12 @@ register_s evalue::getfree() const
 	return Const;
 }
 
-int	evalue::localalloc(unsigned size)
-{
+int	evalue::localalloc(unsigned size) {
 	return 0;
 }
 
-void evalue::load(register_s r)
-{
-	if(reg != r || sym)
-	{
+void evalue::load(register_s r) {
+	if(reg != r || sym) {
 		evalue e2(this);
 		e2.reg = r;
 		if(gen.code)
@@ -118,10 +102,8 @@ void evalue::load(register_s r)
 	sym = 0;
 }
 
-void evalue::dereference()
-{
-	if(result->ispointer())
-	{
+void evalue::dereference() {
+	if(result->ispointer()) {
 		getrvalue();
 		evalue e2(this);
 		e2.sym = lvalue_type;
@@ -133,30 +115,24 @@ void evalue::dereference()
 	}
 }
 
-void evalue::getrvalue()
-{
+void evalue::getrvalue() {
 	if(islvalue())
 		load(getfree());
 }
 
-void evalue::xchange(evalue& e)
-{
+void evalue::xchange(evalue& e) {
 	iswap(reg, e.reg);
 	iswap(offset, e.offset);
 	iswap(sym, e.sym);
 	iswap(result, e.result);
 }
 
-void evalue::cast(symbol* need_type)
-{
+void evalue::cast(symbol* need_type) {
 	if(result == need_type)
 		return;
-	if(result->ispointer() && need_type->ispointer())
-	{
+	if(result->ispointer() && need_type->ispointer()) {
 		// Error;
-	}
-	else if(result->isnumber() && need_type->isnumber())
-	{
+	} else if(result->isnumber() && need_type->isnumber()) {
 		result = need_type;
 	}
 	if(result != need_type)

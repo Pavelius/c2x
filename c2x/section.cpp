@@ -38,7 +38,7 @@ struct data_segment : section, public aref<unsigned char> {
 	data_segment(const char* id) {
 		this->id = id;
 	}
-	
+
 };
 
 struct bbs_segment : section {
