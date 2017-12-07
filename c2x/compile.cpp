@@ -50,10 +50,6 @@ void c2::error(message_s id, ...) {
 void c2::status(message_s id, ...) {
 }
 
-static void declare_status(message_s m, const symbol* member, ...) {
-	status(m, member->id);
-}
-
 static int jumpforward(int a = 0) {
 	// Безусловный переход вперед
 	return 0;
@@ -1071,7 +1067,7 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 		auto m2 = addsymbol(id, result);
 		m2->flags = flags;
 		m2->count = 1;
-		//declare_status(StatusDeclare, m2);
+		status(StatusDeclare, m2->id);
 		if(*ps.p == '(') {
 			scopestate push;
 			next(ps.p + 1);
@@ -1213,6 +1209,8 @@ static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse) {
 		testcondition(0, label_continue);
 		label(label_break);
 	} else if(match("for")) {
+		// For loop has his own scope when open braces
+		scopestate push;
 		skip('(');
 		// Initialize loop
 		if(!declaration(0, false, true, true, true, true)) {
@@ -1309,6 +1307,7 @@ static void block_enums() {
 			if(ischab(*ps.p)) {
 				t = addsymbol(identifier(), result);
 				t->value = num++;
+				t->setpseudoname();
 			} else if(*ps.p == '=') {
 				next(ps.p + 1);
 				num = expression_const();
@@ -1398,4 +1397,5 @@ static symbol* parse_module(const char* id) {
 
 void c2::compile(const char* id) {
 	parse_module(id);
+	gen.unique = false;
 }

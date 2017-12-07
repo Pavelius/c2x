@@ -1,3 +1,4 @@
+import geo.rect;
 import test1;
 
 // public static test1 t3[] = {{2,1}, {4,3}};

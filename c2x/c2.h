@@ -52,6 +52,7 @@ namespace c2 {
 		virtual unsigned get() = 0;
 		virtual unsigned char* getdata() = 0;
 		virtual void	set(unsigned count) = 0;
+		bool			write(const char* url);
 	};
 	struct symbol {
 		const char*		id;
@@ -153,6 +154,7 @@ namespace c2 {
 	extern genstate		gen;
 	bool				isstatic(unsigned flags);
 	bool				isthis(const char* id);
+	void				link(const char* id);
 	unsigned			setpublic(unsigned flags);
 	unsigned			setstatic(unsigned flags);
 	void				status(message_s id, ...);

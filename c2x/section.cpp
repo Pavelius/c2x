@@ -73,11 +73,11 @@ struct bbs_segment : section {
 	}
 
 };
-static data_segment		instance_code(section_code);
-static data_segment		instance_data(section_data);
-static data_segment		instance_strings(section_strings);
-static bbs_segment		instance_bss;
-static section*			predefined_sections[] = {&instance_code, &instance_data, &instance_strings, &instance_bss};
+static data_segment	instance_code(section_code);
+static data_segment	instance_data(section_data);
+static data_segment	instance_strings(section_strings);
+static bbs_segment	instance_bss;
+static section*		predefined_sections[] = {&instance_code, &instance_data, &instance_strings, &instance_bss};
 
 section* section::find(const char* id) {
 	for(auto p : predefined_sections) {

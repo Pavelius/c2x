@@ -81,8 +81,11 @@
     <ClCompile Include="section.cpp">
       <Filter>Компилятор</Filter>
     </ClCompile>
-    <ClCompile Include="gen_state.cpp">
+    <ClCompile Include="genstate.cpp">
       <Filter>Компилятор</Filter>
+    </ClCompile>
+    <ClCompile Include="linker.cpp">
+      <Filter>Линкер</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -101,6 +104,9 @@
     <Filter Include="Пример">
       <UniqueIdentifier>{47fdcb39-b23c-493e-bde4-49e5a8fa5c13}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Линкер">
+      <UniqueIdentifier>{8ca5fe91-3813-4708-a4b1-ff24a8300496}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\c2code\projects\anytest\main.c2">
@@ -110,6 +116,9 @@
       <Filter>Пример</Filter>
     </None>
     <None Include="..\c2code\projects\anytest\test1.c2">
+      <Filter>Пример</Filter>
+    </None>
+    <None Include="..\c2code\library\geo\rect.c2">
       <Filter>Пример</Filter>
     </None>
   </ItemGroup>
