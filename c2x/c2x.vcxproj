@@ -131,12 +131,11 @@
     <ClCompile Include="evalue.cpp" />
     <ClCompile Include="evalue_plugin.cpp" />
     <ClCompile Include="files.cpp" />
-    <ClCompile Include="genstate.cpp" />
+    <ClCompile Include="gen_state.cpp" />
     <ClCompile Include="io.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="messages.cpp" />
     <ClCompile Include="section.cpp" />
-    <ClCompile Include="status_state.cpp" />
     <ClCompile Include="stringcreator.cpp" />
     <ClCompile Include="symbol.cpp" />
     <ClCompile Include="szdup.cpp" />
@@ -144,7 +143,9 @@
     <ClCompile Include="win_io_file.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\c2code\library\geo\point.c2" />
     <None Include="..\c2code\projects\anytest\main.c2" />
+    <None Include="..\c2code\projects\anytest\test1.c2" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

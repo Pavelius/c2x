@@ -2,21 +2,35 @@
 
 using namespace c2;
 
-static void		logical_or(evalue& e1);
-static void		parse_module(symbol* member);
-static symbol*	standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
-static void		statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
-int				c2::errors;
-scope_state		c2::scope;
+static void			logical_or(evalue& e1);
+static void			parse_module(symbol* member);
+static symbol*		standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
+static void			statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
+int					c2::errors;
 
 static struct parser_state {
 	const char*		p;
 	symbol*			current_module;
 	symbol*			current_member;
-	parser_state() {
-		memset(this, 0, sizeof(*this));
-	}
+	parser_state() { memset(this, 0, sizeof(*this)); }
 } ps;
+
+static struct scopestate {
+	scopestate*		parent;
+	const char*		visibility;
+	scopestate();
+	~scopestate();
+} scope;
+
+scopestate::scopestate() : scopestate(scope) {
+	if(this != &scope)
+		scope.parent = this;
+	scope.visibility = ps.p;
+}
+
+scopestate::~scopestate() {
+	scope = *this;
+}
 
 static symbol* getmodule() {
 	return ps.current_module;
@@ -24,16 +38,6 @@ static symbol* getmodule() {
 
 static symbol* getmember() {
 	return ps.current_member;
-}
-
-scope_state::scope_state() : scope_state(scope) {
-	if(this != &scope)
-		scope.parent = this;
-	scope.visibility = ps.p;
-}
-
-scope_state::~scope_state() {
-	scope = *this;
 }
 
 void c2::error(message_s id, ...) {
@@ -47,6 +51,7 @@ void c2::status(message_s id, ...) {
 }
 
 static void declare_status(message_s m, const symbol* member, ...) {
+	status(m, member->id);
 }
 
 static int jumpforward(int a = 0) {
@@ -200,7 +205,7 @@ static void binary_operation(evalue& e2, char t1, char t2 = 0) {
 static symbol* addsymbol(const char* id, symbol* result) {
 	auto p = findsymbol(id, scope.visibility);
 	if(p) {
-		if(state.error_double_identifier)
+		if(gen.unique)
 			error(Error1p2pAlreadyDefined, "symbol", id);
 		return p;
 	}
@@ -213,6 +218,15 @@ static symbol* addsymbol(const char* id, symbol* result) {
 	p->visibility = scope.visibility;
 	p->declared = ps.p;
 	return p;
+}
+
+static symbol* findsymbol(const char* id) {
+	for(auto psc = &scope; psc; psc = psc->parent) {
+		auto sym = findsymbol(id, psc->visibility);
+		if(sym)
+			return sym;
+	}
+	return 0;
 }
 
 static bool skipcm() {
@@ -420,7 +434,6 @@ static bool istype(symbol** declared, unsigned& flags) {
 
 static void initialize(symbol* sym, section* sec) {
 	if(sym->isarray() && *ps.p == '{') {
-		// Array case.
 		next(ps.p + 1);
 		if(sym->count == 0xFFFFFFFF) {
 			// When size of array is unknown.
@@ -428,11 +441,13 @@ static void initialize(symbol* sym, section* sec) {
 			while(true) {
 				sym->count++;
 				initialize(sym->result, sec);
-				if(*ps.p == '}')
+				if(*ps.p == '}') {
 					break;
+				}
 				skip(',');
-				if(*ps.p == '}')
+				if(*ps.p == '}') {
 					break;
+				}
 			}
 		} else {
 			// When size of array is known and we need add emphty elements to the end.
@@ -462,31 +477,30 @@ static void initialize(symbol* sym, section* sec) {
 		addr32(e1.offset, e1.sym, sec);
 	} else if(sym->result) {
 		initialize(sym->result, sec);
+	} if(*ps.p == '{') {
+		next(ps.p + 1);
+		auto t = sym->getchild();
+		while(t) {
+			if(t->ismember() && !t->isfunction()) {
+				initialize(t, sec);
+				if(*ps.p == '}')
+					break;
+				skip(',');
+				if(*ps.p == '}')
+					break;
+			}
+			t = t->getnext();
+		}
+		skip('}');
 	} else {
-		if(*ps.p == '{') {
-			skip('{');
-			auto t = sym->getchild();
-			while(t) {
-				if(t->ismember() && !t->isfunction()) {
-					initialize(t, sec);
-					if(*ps.p == '}')
-						break;
-					skip(',');
-					if(*ps.p == '}')
-						break;
-				}
-				t = t->getnext();
-			}
-		} else {
-			// simple type
-			int s = sym->size;
-			int v = expression_const();
-			while(s > 0) {
-				if(sec)
-					sec->add((unsigned char)(v & 255));
-				v >>= 8;
-				s--;
-			}
+		// simple type
+		int s = sym->size;
+		int v = expression_const();
+		while(s > 0) {
+			if(sec)
+				sec->add((unsigned char)(v & 255));
+			v >>= 8;
+			s--;
 		}
 	}
 }
@@ -998,12 +1012,10 @@ static void instance(symbol* variable, bool runtime_assigment, bool allow_assigm
 	} else if(variable->isstatic()) {
 		// Static members can be in initialized section or uninitialized.
 		// Predict this by assigment passed after initialization.
-		if(gen.code) {
-			if(was_initialized)
-				variable->section = section::find(section_data);
-			else
-				variable->section = section::find(section_bbs);
-		}
+		if(was_initialized)
+			variable->section = section::find(section_data);
+		else
+			variable->section = section::find(section_bbs);
 	} else {
 		// This is not static member case. Can be local variable, function parameter or module member.
 		// Get last element in this visible scope and add his size to calculate base of this element.
@@ -1029,11 +1041,10 @@ static void instance(symbol* variable, bool runtime_assigment, bool allow_assigm
 	}
 	// Calculate size of single module element. Get size from type of expression.
 	variable->size = variable->result->size;
-	auto m = getmodule();
 	if(variable->ismember() && !variable->isstatic() && !variable->isfunction()) {
 		// Module member change size of his parent.
 		auto m = getmodule();
-		m->size += variable->size;
+		m->size += variable->getsize();
 	}
 }
 
@@ -1058,9 +1069,11 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 			// Если нашли совпадение выдаем ошибку
 		}
 		auto m2 = addsymbol(id, result);
+		m2->flags = flags;
+		m2->count = 1;
 		//declare_status(StatusDeclare, m2);
 		if(*ps.p == '(') {
-			scope_state push;
+			scopestate push;
 			next(ps.p + 1);
 			m2->count = 0;
 			while(*ps.p) {
@@ -1083,7 +1096,7 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 				// Forward declaration
 				next(ps.p + 1);
 			} else {
-				scope_state push;
+				scopestate push;
 				auto ps_current_member = ps.current_member;
 				ps.current_member = m2;
 				prologue();
@@ -1118,8 +1131,9 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 static void statement(int* ct, int* br, int* cs, int* ds, evalue* cse) {
 	if(match(';')) {
 		// Empthy statement
-	} else if(match('{')) {
-		scope_state push;
+	} else if(*ps.p == '{') {
+		scopestate push;
+		skip('{');
 		while(*ps.p) {
 			if(*ps.p == '}') {
 				next(ps.p + 1);
@@ -1344,32 +1358,27 @@ static void block_imports() {
 			}
 			if(isloaded(m))
 				error(Error1p2pAlreadyDefined, "import module", m->id);
-			addsymbol(id, m);
+			m = addsymbol(id, m);
+			m->setpseudoname();
 			skip(';');
 			break;
 		}
 	}
 }
 
-static void block_start(symbol* sym) {
+static void parse_module(symbol* sym) {
+	scopestate push;
+	auto save_ps = ps;
 	if(!sym->visibility)
 		sym->visibility = getfile(sym->id);
-	if(!sym->visibility) {
+	if(!sym->visibility)
 		status(ErrorCantFind1pWithName2p, "import module", sym->id);
-		return;
-	}
-	sym->declared = sym->visibility;
 	ps.current_module = sym;
+	sym->declared = sym->visibility;
 	scope.parent = 0;
 	scope.visibility = sym->visibility;
 	ps.p = scope.visibility;
 	next(ps.p);
-}
-
-static void parse_module(symbol* member) {
-	scope_state push;
-	const char* p1 = ps.p;
-	block_start(member);
 	if(!errors)
 		block_imports();
 	if(!errors) {
@@ -1382,7 +1391,7 @@ static void parse_module(symbol* member) {
 		block_function();
 	if(!errors && *ps.p)
 		status(ErrorUnexpectedSymbols);
-	ps.p = p1;
+	ps = save_ps;
 }
 
 void c2::compile(const char* id) {

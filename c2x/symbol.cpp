@@ -30,6 +30,10 @@ bool symbol::istype() const {
 	return this && !result;
 }
 
+bool symbol::islocal() const {
+	return this && result && !section;
+}
+
 bool symbol::istypesimple() const {
 	return this && !result && visibility==0;
 }
@@ -59,10 +63,6 @@ bool symbol::isstatic() const {
 	return (flags & (1 << Static)) != 0;
 }
 
-bool symbol::islocal() const {
-	return this && visibility && visibility[0] == '{';
-}
-
 bool symbol::isnumber() const {
 	return this == i8
 		|| this == u8
@@ -74,6 +74,10 @@ bool symbol::isnumber() const {
 
 bool symbol::ispseudoname() const {
 	return this && result && (flags & (1 << Pseudoname)) != 0;
+}
+
+void symbol::setpseudoname() {
+	flags |= (1 << Pseudoname);
 }
 
 symbol* symbol::add() {
@@ -187,15 +191,6 @@ symbol* c2::findsymbol(const char* name, const char* visibility, bool is_functio
 	for(auto& e : symbols) {
 		if(e.id == name && e.visibility == visibility && e.isfunction()==is_function)
 			return &e;
-	}
-	return 0;
-}
-
-symbol* c2::findsymbol(const char* id) {
-	for(auto psc = &scope; psc; psc = psc->parent) {
-		auto sym = findsymbol(id, psc->visibility);
-		if(sym)
-			return sym;
 	}
 	return 0;
 }

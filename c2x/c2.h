@@ -42,9 +42,6 @@ namespace c2 {
 		Eax, Ebx, Ecx, Edx, Esi, Edi, Esp, Ebp,
 		Const,
 	};
-	struct state_state {
-		bool			error_double_identifier;
-	};
 	struct section {
 		const char*		id;
 		unsigned		rvabase;
@@ -55,12 +52,6 @@ namespace c2 {
 		virtual unsigned get() = 0;
 		virtual unsigned char* getdata() = 0;
 		virtual void	set(unsigned count) = 0;
-	};
-	struct scope_state {
-		scope_state*	parent;
-		const char*		visibility;
-		scope_state();
-		~scope_state();
 	};
 	struct symbol {
 		const char*		id;
@@ -96,8 +87,7 @@ namespace c2 {
 		bool			istype() const;
 		bool			istypesimple() const;
 		symbol*			reference();
-		void			setfunction();
-		void			setfunctionfw();
+		void			setpseudoname();
 	};
 	struct evalue {
 		struct plugin {
@@ -153,7 +143,6 @@ namespace c2 {
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
-	symbol*				findsymbol(const char* id);
 	symbol*				findsymbol(const char* id, const char* visibility);
 	symbol*				findsymbol(const char* id, const char* visibility, bool function);
 	symbol*				findtype(const char* id, unsigned flags);
@@ -163,10 +152,8 @@ namespace c2 {
 	bool				isloaded(symbol* result);
 	bool				isstatic(unsigned flags);
 	bool				isthis(const char* id);
-	extern scope_state	scope;
 	unsigned			setpublic(unsigned flags);
 	unsigned			setstatic(unsigned flags);
-	extern state_state	state;
 	void				status(message_s id, ...);
 
 	extern symbol		types[]; // Такого родителя имеют все типы
