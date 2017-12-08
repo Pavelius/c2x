@@ -59,6 +59,7 @@ namespace c2 {
 		symbol*			result;
 		const char*		visibility; // For module or module member this value equal start of text file. Local variables and parameters have it own visibility.
 		const char*		declared; // Line where symbol declared.
+		const char*		content;
 		unsigned		size;
 		unsigned		count; // Count of array elements. For non array this member is zero.
 		int				value;
@@ -136,16 +137,21 @@ namespace c2 {
 	struct genstate {
 		bool			code;
 		bool			unique;
-		bool			methods;
+		bool			usedsymbols;
 		genstate();
 		~genstate();
 	};
-	extern evalue::plugin*	backend;
+	typedef adat<symbol, 8096> symbolset;
+	extern symbolset	symbols;
+	extern symbolset	pointers;
+	extern symbolset	modules;
+	extern evalue::plugin* backend;
 	void				compile(const char* url);
 	void				error(message_s id, ...);
 	extern int			errors;
 	void				errorv(message_s m, const symbol* module, const symbol* member, const char* parameters);
 	symbol*				findmodule(const char* id);
+	symbol*				findmodulebv(const char* visiblility);
 	symbol*				findsymbol(const char* id, const char* visibility);
 	symbol*				findsymbol(const char* id, const char* visibility, bool function);
 	symbol*				findtype(const char* id, unsigned flags);

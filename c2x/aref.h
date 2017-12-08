@@ -22,7 +22,7 @@ template<class T>
 struct aref
 {
 	T*						data;
-	int						count;
+	unsigned				count;
 	//
 	inline T&				operator[](int index) { return data[index]; }
 	//

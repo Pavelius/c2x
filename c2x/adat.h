@@ -25,5 +25,6 @@ struct adat {
 	int						indexof(const T t) const { for(unsigned i = 0; i < count; i++) if(data[i] == t) return i; return -1; }
 	bool					is(const T t) const { for(unsigned i = 0; i < count; i++) if(data[i] == t) return true; return false; }
 	void					remove(int index, int remove_count = 1) { if(index < 0) return; if(index<int(count - 1)) memcpy(data + index, data + index + 1, sizeof(data[0])*(count - index - 1)); count--; }
+	void					reserve() { /* Nothing to do*/ }
 	void					swap(int i1, int i2) { T e1 = data[i1]; data[i1] = data[i2]; data[i2] = e1; }
 };

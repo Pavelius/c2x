@@ -94,7 +94,7 @@ void evalue::load(register_s r) {
 	if(reg != r || sym) {
 		evalue e2(this);
 		e2.reg = r;
-		if(gen.code)
+		if(gen.code && backend)
 			backend->operation(e2, *this, '=');
 	}
 	reg = r;
@@ -107,7 +107,7 @@ void evalue::dereference() {
 		getrvalue();
 		evalue e2(this);
 		e2.sym = lvalue_type;
-		if(gen.code)
+		if(gen.code && backend)
 			backend->operation(*this, e2, '=');
 		offset = 0;
 		sym = 0;

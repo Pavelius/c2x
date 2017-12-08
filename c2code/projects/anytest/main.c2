@@ -1,13 +1,14 @@
 import geo.rect;
 import test1;
 
-// public static test1 t3[] = {{2,1}, {4,3}};
+public static test1 t3[] = {{2,1}, {4,3}};
 // public static char* string = "Count is good";
 // public static char t1[8] = {12, 8, 10};
 // public static char t2[] = {2, 4, 0};
 
 int main()
 {
+	t3[0].a = 0;
 	int i, j = 12;
 	if(j==12) {
 		int j = 10;

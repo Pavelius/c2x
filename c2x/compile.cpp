@@ -2,11 +2,12 @@
 
 using namespace c2;
 
-static void			logical_or(evalue& e1);
-static symbol*		parse_module(const char* id);
-static symbol*		standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
-static void			statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
-int					c2::errors;
+static void		logical_or(evalue& e1);
+static symbol*	parse_module(const char* id);
+static symbol*	standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
+static void		statement(int* ct, int* br, int* cs, int* ds, evalue* cse = 0);
+int				c2::errors;
+static adat<symbol*, 8192> used_symbols;
 
 static struct parser_state {
 	const char*		p;
@@ -70,11 +71,12 @@ static void label(int i) {
 
 static int label() {
 	// Создает метку в текущем месте
-	//return segments[Code]->get();
-	return 0;
+	return section::find(section_code)->get();
 }
 
-static void addr32(int v, symbol* sym, section* sec) {
+static void addr32(int v, symbol* sym, section* sec = 0) {
+	if(!sec)
+		sec = sym->section;
 	auto s = 4;
 	while(s > 0) {
 		if(sec)
@@ -360,8 +362,6 @@ static symbol* expression_const_type() {
 	return result;
 }
 
-static int test_01[] = {0, {2}};
-
 static bool istype(symbol** declared, unsigned& flags) {
 	auto e = i32;
 	bool result = false;
@@ -393,6 +393,9 @@ static bool istype(symbol** declared, unsigned& flags) {
 				e = findtype(id, flags);
 			if(!e && parent_module) {
 				e = findtype(id, parent_module->visibility);
+				// variable contain pseudoname
+				if(e->ispseudoname())
+					e = e->result;
 				if(!e) {
 					auto this_name = szext(parent_module->id);
 					if(!this_name)
@@ -754,14 +757,16 @@ static void postfix(evalue& e1) {
 }
 
 static void register_used_symbol(symbol* sym) {
-	if(!gen.methods)
+	if(!gen.usedsymbols)
 		return;
-	//for(auto p : used_symbols) {
-	//	if(p == sym)
-	//		return;
-	//}
-	//used_symbols.reserve();
-	//used_symbols.add(sym);
+	if(sym->isfunction() || sym->isstatic()) {
+		for(auto p : used_symbols) {
+			if(p == sym)
+				return;
+		}
+		used_symbols.reserve();
+		used_symbols.add(sym);
+	}
 }
 
 static void unary(evalue& e1) {
@@ -1026,6 +1031,7 @@ static void instance(symbol* variable, bool runtime_assigment, bool allow_assigm
 		if(!allow_assigment)
 			status(ErrorInvalid1p2pIn3p, "operator", "=", "after static variable");
 		next(ps.p + 1);
+		variable->content = ps.p;
 		if(runtime_assigment && *ps.p != '{') {
 			evalue e1; e1.set(variable);
 			evalue e2(&e1);
@@ -1095,6 +1101,7 @@ static bool declaration(unsigned flags, bool allow_functions, bool allow_variabl
 				scopestate push;
 				auto ps_current_member = ps.current_member;
 				ps.current_member = m2;
+				m2->content = ps.p;
 				prologue();
 				statement(0, 0, 0, 0);
 				retproc();
@@ -1398,4 +1405,31 @@ static symbol* parse_module(const char* id) {
 void c2::compile(const char* id) {
 	parse_module(id);
 	gen.unique = false;
+	gen.code = true;
+	gen.usedsymbols = true;
+	auto name_main = szdup("main");
+	auto start_module = findmodule(name_main);
+	if(!start_module)
+		return;
+	auto start = findsymbol(name_main, start_module->visibility);
+	if(!start)
+		return;
+	register_used_symbol(start);
+	for(unsigned i = 0; i < used_symbols.count; i++) {
+		if(used_symbols.data[i]->content && used_symbols.data[i]->isfunction()) {
+			scopestate scope_global;
+			ps.current_member = used_symbols.data[i];
+			ps.current_module = findmodulebv(ps.current_member->visibility);
+			scope.visibility = ps.current_member->visibility;
+			scopestate scope_local_param;
+			scope.visibility = ps.current_member->declared;
+			scopestate scope_local;
+			scope.visibility = ps.current_member->content;
+			ps.p = ps.current_member->content;
+			prologue();
+			statement(0, 0, 0, 0);
+			retproc();
+			epilogue();
+		}
+	}
 }

@@ -3,15 +3,10 @@
 
 using namespace c2;
 
-typedef adat<symbol, 8096> symbolset;
-
 enum flag_s : char {
 	Public, Static, Readed, Writed, Pseudoname
 };
 
-static symbolset symbols;
-static symbolset pointers;
-static symbolset modules;
 static symbol* standart_types[] = {i8, i16, i32, u8, u16, u32, v0};
 static unsigned	pointer_size = 4;
 symbol c2::i8[1]; // Байт со знаком
@@ -22,6 +17,9 @@ symbol c2::u16[1]; // Слово без знака
 symbol c2::u32[1]; // Двойное слово без знака
 symbol c2::v0[1]; // Путое значение
 symbol c2::types[1];
+symbolset c2::symbols;
+symbolset c2::pointers;
+symbolset c2::modules;
 
 void symbol::clear() {
 	memset(this, 0, sizeof(*this));
@@ -117,9 +115,16 @@ symbol* symbol::dereference() {
 symbol*	symbol::getchild() const {
 	auto pe = symbols.end();
 	auto pp = declared;
-	for(auto p = this + 1; p < pe; p++) {
-		if(p->visibility == pp)
-			return (symbol*)p;
+	if(istype()) {
+		for(auto p = symbols.begin(); p < pe; p++) {
+			if(p->visibility == visibility)
+				return (symbol*)p;
+		}
+	} else {
+		for(auto p = this + 1; p < pe; p++) {
+			if(p->visibility == pp)
+				return (symbol*)p;
+		}
 	}
 	return 0;
 }
@@ -183,6 +188,14 @@ symbol* c2::findsymbol(const char* name, const char* visibility, bool is_functio
 symbol* c2::findmodule(const char* id) {
 	for(auto& e : modules) {
 		if(e.id == id)
+			return &e;
+	}
+	return 0;
+}
+
+symbol* c2::findmodulebv(const char* visiblility) {
+	for(auto& e : modules) {
+		if(e.visibility == visiblility)
 			return &e;
 	}
 	return 0;
