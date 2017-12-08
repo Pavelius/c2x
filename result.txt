@@ -1,0 +1,14 @@
+﻿main PROC
+mov eax, [0]
+mov eax, [0]
+mov eax, 0
+mov [ebp-4], 12
+mov [ebp-4], 12
+mov [ebp+0], 10
+add [ebp+0], 10
+mov eax, [ebp+0]
+mov eax, [ebp+0]
+mov [ebp+0], 10
+ret
+ENDP
+

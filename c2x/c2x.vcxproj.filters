@@ -87,6 +87,9 @@
     <ClCompile Include="linker.cpp">
       <Filter>Линкер</Filter>
     </ClCompile>
+    <ClCompile Include="backend_asm.cpp">
+      <Filter>Бэкенд</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Поддержка">
@@ -107,6 +110,9 @@
     <Filter Include="Линкер">
       <UniqueIdentifier>{8ca5fe91-3813-4708-a4b1-ff24a8300496}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Бэкенд">
+      <UniqueIdentifier>{38f537b9-c836-4e53-a126-9ec462d607e5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\c2code\projects\anytest\main.c2">
@@ -121,5 +127,10 @@
     <None Include="..\c2code\library\geo\rect.c2">
       <Filter>Пример</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\result.txt">
+      <Filter>Пример</Filter>
+    </Text>
   </ItemGroup>
 </Project>

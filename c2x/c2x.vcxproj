@@ -126,6 +126,7 @@
     <ClInclude Include="win.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="backend_asm.cpp" />
     <ClCompile Include="collection.cpp" />
     <ClCompile Include="compile.cpp" />
     <ClCompile Include="crt.cpp" />
@@ -150,6 +151,9 @@
     <None Include="..\c2code\library\geo\rect.c2" />
     <None Include="..\c2code\projects\anytest\main.c2" />
     <None Include="..\c2code\projects\anytest\test1.c2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\result.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -93,28 +93,26 @@ static void prologue() {
 	auto sym = getmember();
 	if(!sym)
 		return;
-	//if(gen.code) {
-	//	sym->value = segments[Code]->get();
-	//	backend->prologue(scope.member, sym);
-	//}
+	if(gen.code && backend) {
+		sym->value = section::find(section_code)->get();
+		backend->prologue(getmodule(), sym);
+	}
 }
 
 static void epilogue() {
 	auto sym = getmember();
 	if(!sym)
 		return;
-	//if(!ps.module || !sym)
-	//	return;
-	//if(gen.code)
-	//	backend->epilogue(ps.module, sym);
+	if(gen.code && backend)
+		backend->epilogue(getmodule(), sym);
 }
 
 static void retproc() {
 	auto sym = getmember();
 	if(!sym)
 		return;
-	//if(gen.code)
-	//	backend->retproc(sym);
+	if(gen.code && backend)
+		backend->retproc(sym);
 }
 
 static void unary_operation(evalue& e2, char t1) {
@@ -130,8 +128,8 @@ static void unary_operation(evalue& e2, char t1) {
 			break;
 		}
 	}
-	//if(gen.code)
-	//	backend->operation(e2, t1);
+	if(gen.code && backend)
+		backend->operation(e2, t1);
 }
 
 static void binary_operation(evalue& e2, char t1, char t2 = 0) {
@@ -196,8 +194,8 @@ static void binary_operation(evalue& e2, char t1, char t2 = 0) {
 	}
 	if(e1.islvalue() && e2.islvalue())
 		e1.load();
-	//if(gen.code)
-	//	backend->operation(e1, e2, t1, t2);
+	if(gen.code && backend)
+		backend->operation(e1, e2, t1, t2);
 }
 
 static symbol* addsymbol(const char* id, symbol* result) {
